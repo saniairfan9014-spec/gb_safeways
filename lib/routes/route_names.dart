@@ -8,4 +8,6 @@ class RouteNames {
   static const String roadStatus = '/road-status';
   static const String addReport = '/add-report';
   static const String emergency = '/emergency';
+  static const String alerts = '/alerts';
+  static const String profile = '/profile';
 }

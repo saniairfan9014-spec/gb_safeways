@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../features/auth/view/login_screen.dart';
 import '../features/auth/view/signup_screen.dart';
 import '../features/home/view/home_screen.dart';
+import '../features/auth/view/profile_screen.dart';
 import '../features/roads/view/road_status_screen.dart';
 import '../features/reports/view/report_screen.dart';
+import '../features/reports/view/alerts_screen.dart';
 import '../features/emergency/view/emergency_screen.dart';
 import 'route_names.dart';
 
@@ -34,6 +36,12 @@ class AppRoutes {
 
       case RouteNames.emergency:
         return MaterialPageRoute(builder: (_) => const EmergencyScreen());
+
+      case RouteNames.alerts:
+        return MaterialPageRoute(builder: (_) => const AlertsScreen());
+
+      case RouteNames.profile:
+        return MaterialPageRoute(builder: (_) => const ProfileScreen());
 
       default:
         return MaterialPageRoute(

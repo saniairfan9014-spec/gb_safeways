@@ -193,8 +193,7 @@ class _DashboardViewState extends State<DashboardView> {
                     // User Avatar with contribution badge tooltip
                     GestureDetector(
                       onTap: () {
-                        // Simple logout or profile toggle
-                        _showProfileDialog(context, authController);
+                        Navigator.pushNamed(context, RouteNames.profile);
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -316,13 +315,7 @@ class _DashboardViewState extends State<DashboardView> {
                         accentColor: const Color(0xFFF59E0B), // Warning Amber
                         badgeCount: updates.length,
                         onTap: () {
-                          // Standard modal to view active alert counts
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("You have ${updates.length} active mountain alerts in your area."),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          Navigator.pushNamed(context, RouteNames.alerts);
                         },
                       ),
                     ),
@@ -652,54 +645,6 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ),
       ),
-    );
-  }
-
-  void _showProfileDialog(BuildContext context, AuthController authController) {
-    final user = authController.currentUser;
-    if (user == null) return;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              CircleAvatar(backgroundImage: NetworkImage(user.avatarUrl)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Rank: ${user.badge}", style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
-              const SizedBox(height: 4),
-              Text("Helper Points: ${user.contributionsCount}"),
-              const SizedBox(height: 12),
-              const Text("GB SafeRoute maintains localized cache databases for active routes, letting you query landslides offline.", style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                authController.logout();
-              },
-              child: const Text("Sign Out", style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Dismiss", style: TextStyle(color: Color(0xFF64748B))),
-            ),
-          ],
-        );
-      },
     );
   }
 }
