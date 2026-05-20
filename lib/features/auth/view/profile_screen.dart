@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/services/notification_service.dart';
 import '../../auth/controller/auth_controller.dart';
 import '../../reports/controller/report_controller.dart';
+import '../../emergency/controller/emergency_controller.dart';
 import '../../../routes/route_names.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -14,36 +15,62 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthController>().loadUserStats();
+    });
+  }
+
+  // Local state for toggles and settings
   bool _pushNotifications = true;
   String _selectedLanguage = "English";
 
+  // Privacy preferences states
+  bool _shareLocation = true;
+  bool _anonymousReports = false;
+  bool _publicVisibility = true;
+
+  // Language Dialog
   void _showLanguageDialog(BuildContext context, bool isLight) {
     final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
-    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
     final cardBg = isLight ? Colors.white : AppColors.surface;
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cardBg,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           "Select Language",
-          style: TextStyle(fontWeight: FontWeight.bold, color: textPrim),
+          style: TextStyle(fontWeight: FontWeight.bold, color: textPrim, fontSize: 18),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: ["English", "Urdu (اردو)", "Balti / Shina"].map((lang) {
-            final isSelected = _selectedLanguage.startsWith(lang.split(' ')[0]);
+            final isSelected = _selectedLanguage == lang.split(' ')[0];
             return ListTile(
-              title: Text(lang, style: TextStyle(color: textPrim, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-              trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: Color(0xFF0284C7)) : null,
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                lang,
+                style: TextStyle(
+                  color: textPrim,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              trailing: isSelected
+                  ? const Icon(Icons.check_circle_rounded, color: Color(0xFF0284C7))
+                  : null,
               onTap: () {
                 setState(() {
                   _selectedLanguage = lang.split(' ')[0];
                 });
                 Navigator.pop(ctx);
-                NotificationService.instance.showSuccessSnackbar("Language updated to $_selectedLanguage.");
+                NotificationService.instance.showSuccessSnackbar(
+                  "Language updated to $_selectedLanguage.",
+                );
               },
             );
           }).toList(),
@@ -52,10 +79,233 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Emergency Contacts Modal Bottom Sheet
+  void _showEmergencyContactsSheet(BuildContext context, bool isLight) {
+    final emergencyController = context.read<EmergencyController>();
+    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
+    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
+    final cardBg = isLight ? Colors.white : AppColors.surface;
+    final borderCol = isLight ? const Color(0xFFF1F5F9) : AppColors.border;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isLight ? const Color(0xFFE2E8F0) : AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  "Mountain Patrol Contacts",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textPrim,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Direct hotline calls to search & rescue command centers",
+                  style: TextStyle(fontSize: 13, color: textSec),
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: emergencyController.contacts.take(4).length,
+                    separatorBuilder: (_, __) => Divider(color: borderCol, height: 1),
+                    itemBuilder: (context, index) {
+                      final contact = emergencyController.contacts[index];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withOpacity(0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(contact.icon, color: const Color(0xFFEF4444), size: 18),
+                        ),
+                        title: Text(
+                          contact.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: textPrim,
+                          ),
+                        ),
+                        subtitle: Text(
+                          "${contact.location} • ${contact.phone}",
+                          style: TextStyle(fontSize: 12, color: textSec),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.phone_forwarded_rounded, color: Color(0xFF0284C7), size: 18),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            emergencyController.makeCall(contact.phone);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Privacy Settings Modal Bottom Sheet
+  void _showPrivacySettingsSheet(BuildContext context, bool isLight) {
+    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
+    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
+    final cardBg = isLight ? Colors.white : AppColors.surface;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isLight ? const Color(0xFFE2E8F0) : AppColors.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "Privacy Preferences",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textPrim,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Manage your safety tracking and dispatch details",
+                      style: TextStyle(fontSize: 13, color: textSec),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Share Location Toggle
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        "Live Dispatch Tracking",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
+                      ),
+                      subtitle: Text(
+                        "Share live GPS location with rescuers during active SOS triggers.",
+                        style: TextStyle(fontSize: 12, color: textSec),
+                      ),
+                      value: _shareLocation,
+                      activeColor: const Color(0xFF0284C7),
+                      onChanged: (val) {
+                        setModalState(() => _shareLocation = val);
+                        setState(() => _shareLocation = val);
+                        NotificationService.instance.showSuccessSnackbar(
+                          val ? "Emergency tracking enabled." : "Emergency tracking disabled.",
+                        );
+                      },
+                    ),
+                    const Divider(height: 16),
+
+                    // Anonymous Toggle
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        "Anonymous Reporting",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
+                      ),
+                      subtitle: Text(
+                        "Hide your name on community landslide or road blockage alerts.",
+                        style: TextStyle(fontSize: 12, color: textSec),
+                      ),
+                      value: _anonymousReports,
+                      activeColor: const Color(0xFF0284C7),
+                      onChanged: (val) {
+                        setModalState(() => _anonymousReports = val);
+                        setState(() => _anonymousReports = val);
+                        NotificationService.instance.showSuccessSnackbar(
+                          val ? "Reports set to anonymous." : "Reports linked to profile.",
+                        );
+                      },
+                    ),
+                    const Divider(height: 16),
+
+                    // Public Profile Visibility
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        "Guide Directory Visibility",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
+                      ),
+                      subtitle: Text(
+                        "Allow certified high-altitude guides to see your route history.",
+                        style: TextStyle(fontSize: 12, color: textSec),
+                      ),
+                      value: _publicVisibility,
+                      activeColor: const Color(0xFF0284C7),
+                      onChanged: (val) {
+                        setModalState(() => _publicVisibility = val);
+                        setState(() => _publicVisibility = val);
+                        NotificationService.instance.showSuccessSnackbar(
+                          val ? "Profile visible to rescue guides." : "Profile set to private.",
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authController = context.watch<AuthController>();
     final reportController = context.watch<ReportController>();
+    final emergencyController = context.watch<EmergencyController>();
     final user = authController.currentUser;
     final isLight = Theme.of(context).brightness == Brightness.light;
 
@@ -65,18 +315,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // Dynamic stats
-    final reportsCount = user.contributionsCount;
-    // Alerts received can be estimated dynamically
-    final alertsCount = (reportController.reports.length * 6) + 12;
-
-    // Adaptive tokens
+    // Adaptive token styles (optimized for high readability and mountainous usage)
     final bgCol = isLight ? const Color(0xFFF8FAFC) : AppColors.background;
     final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
     final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
     final textMut = isLight ? const Color(0xFF94A3B8) : AppColors.textMuted;
     final cardBg = isLight ? Colors.white : AppColors.surface;
-    final borderCol = isLight ? const Color(0xFFE2E8F0) : AppColors.border;
+    final borderCol = isLight ? const Color(0xFFF1F5F9) : AppColors.border;
+
+    // SOS Requests: Dynamic check if currently triggered, else standard mock
+    final sosCount = authController.emergenciesCount > 0 
+        ? authController.emergenciesCount 
+        : (emergencyController.sosTriggered ? 3 : 2);
 
     return Scaffold(
       backgroundColor: bgCol,
@@ -89,7 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          "My Profile",
+          "GB SafeRoute",
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
@@ -100,82 +350,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. User Avatar and Name at Top
-              Center(
+              // 1. Top Identity Section (User Avatar, Name, Email/Phone)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderCol, width: 1.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isLight ? 0.02 : 0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF0284C7), width: 3),
-                      ),
-                      child: CircleAvatar(
-                        radius: 54,
-                        backgroundImage: NetworkImage(user.avatarUrl),
-                      ),
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF0284C7), width: 3),
+                          ),
+                          child: CircleAvatar(
+                            radius: 46,
+                            backgroundColor: const Color(0xFF0284C7).withOpacity(0.1),
+                            backgroundImage: NetworkImage(user.avatarUrl),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0284C7),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cardBg, width: 2),
+                          ),
+                          child: const Text(
+                            "ACTIVE",
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Text(
                       user.fullName,
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: textPrim,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0284C7).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.badge,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0284C7),
                       ),
-                      child: Text(
-                        user.badge.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0284C7),
-                          letterSpacing: 0.5,
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(color: borderCol, height: 1),
+                    const SizedBox(height: 12),
+                    
+                    // Email Info Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.email_outlined, size: 16, color: Color(0xFF0284C7)),
+                        const SizedBox(width: 8),
+                        Text(
+                          user.email,
+                          style: TextStyle(fontSize: 13, color: textSec),
                         ),
-                      ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Phone Info Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.phone_iphone_rounded, size: 16, color: Color(0xFF0284C7)),
+                        const SizedBox(width: 8),
+                        Text(
+                          user.phoneNumber,
+                          style: TextStyle(fontSize: 13, color: textSec, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              // 2. Stats Section
-              Text(
-                "Stats Section",
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: textMut,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 12),
+              // 2. Stats Section Cards
               Row(
                 children: [
-                  // Reports Stat
+                  // Total Reports Sent Card
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: cardBg,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderCol, width: 1.2),
+                        border: Border.all(color: borderCol, width: 1.0),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isLight ? 0.03 : 0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                            color: Colors.black.withOpacity(isLight ? 0.02 : 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -184,46 +484,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
+                            children: [
                               Text(
-                                "Reports Made",
+                                "Total Reports",
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF64748B),
+                                  color: textSec,
                                 ),
                               ),
-                              Icon(Icons.report_problem_rounded, color: Color(0xFFF59E0B), size: 16),
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B).withOpacity(0.08),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.campaign_rounded, color: Color(0xFFF59E0B), size: 16),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Text(
-                            "$reportsCount",
+                            "${user.contributionsCount}",
                             style: TextStyle(
-                              fontSize: 28,
+                              fontSize: 26,
                               fontWeight: FontWeight.w900,
                               color: textPrim,
                             ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "Safety contributions",
+                            style: TextStyle(fontSize: 10, color: textMut),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 16),
 
-                  // Alerts Received Stat
+                  // Emergency SOS Requests Card
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: cardBg,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderCol, width: 1.2),
+                        border: Border.all(color: borderCol, width: 1.0),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isLight ? 0.03 : 0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                            color: Colors.black.withOpacity(isLight ? 0.02 : 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -232,26 +544,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
+                            children: [
                               Text(
-                                "Alerts Received",
+                                "SOS Beacons",
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF64748B),
+                                  color: textSec,
                                 ),
                               ),
-                              Icon(Icons.notifications_active_rounded, color: Color(0xFF0284C7), size: 16),
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444).withOpacity(0.08),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.sensors_rounded, color: Color(0xFFEF4444), size: 16),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Text(
-                            "$alertsCount",
+                            "$sosCount",
                             style: TextStyle(
-                              fontSize: 28,
+                              fontSize: 26,
                               fontWeight: FontWeight.w900,
                               color: textPrim,
                             ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "Total requests made",
+                            style: TextStyle(fontSize: 10, color: textMut),
                           ),
                         ],
                       ),
@@ -259,29 +583,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // 3. Settings List
               Text(
-                "Settings List",
+                "PREFERENCES & CONTROL",
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
                   color: textMut,
-                  letterSpacing: 0.5,
+                  letterSpacing: 1.0,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Container(
                 decoration: BoxDecoration(
                   color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderCol, width: 1.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderCol, width: 1.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isLight ? 0.03 : 0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                      color: Colors.black.withOpacity(isLight ? 0.02 : 0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -289,27 +613,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     // Notifications Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.notifications_outlined, color: Color(0xFF0284C7), size: 20),
+                        child: const Icon(Icons.notifications_active_outlined, color: Color(0xFF0284C7), size: 18),
                       ),
                       title: Text(
-                        "Notifications",
+                        "Safety Notifications",
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
                       ),
-                      trailing: Switch(
+                      trailing: Switch.adaptive(
                         value: _pushNotifications,
                         onChanged: (val) {
                           setState(() {
                             _pushNotifications = val;
                           });
                           NotificationService.instance.showSuccessSnackbar(
-                            val ? "Notifications activated." : "Notifications muted.",
+                            val ? "Road hazard alerts activated." : "Alerts muted. Stay cautious!",
                           );
                         },
                         activeColor: const Color(0xFF0284C7),
@@ -319,17 +643,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     // Language Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.language_outlined, color: Color(0xFF0284C7), size: 20),
+                        child: const Icon(Icons.translate_rounded, color: Color(0xFF0284C7), size: 18),
                       ),
                       title: Text(
-                        "Language",
+                        "Language Selection",
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
                       ),
                       trailing: Row(
@@ -349,48 +673,94 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     // Emergency Contacts Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.contact_phone_outlined, color: Color(0xFF0284C7), size: 20),
+                        child: const Icon(Icons.emergency_outlined, color: Color(0xFF0284C7), size: 18),
                       ),
                       title: Text(
-                        "Emergency Contacts",
+                        "Emergency Patrol Contacts",
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            "1122 & Highway",
-                            style: TextStyle(color: textSec, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
-                        ],
+                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
+                      onTap: () => _showEmergencyContactsSheet(context, isLight),
+                    ),
+                    Divider(color: borderCol, height: 1, thickness: 1),
+
+                    // Privacy Settings Row
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.shield_outlined, color: Color(0xFF0284C7), size: 18),
                       ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        NotificationService.instance.showSuccessSnackbar("Emergency contacts are active. To make SOS dials, select the Emergency SOS tab.");
-                      },
+                      title: Text(
+                        "Privacy & Tracking Settings",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
+                      onTap: () => _showPrivacySettingsSheet(context, isLight),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 36),
 
-              // 4. Logout Button
-              OutlinedButton(
+              // 4. Logout Button (highlighted but minimal)
+              ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context);
-                  authController.logout();
+                  // Standard confirm logout dialog
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: cardBg,
+                      surfaceTintColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      title: Text(
+                        "Sign Out",
+                        style: TextStyle(fontWeight: FontWeight.bold, color: textPrim, fontSize: 18),
+                      ),
+                      content: Text(
+                        "Are you sure you want to log out from GB SafeRoute? Direct disaster alerts will be inactive.",
+                        style: TextStyle(color: textSec, fontSize: 14),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text("Cancel", style: TextStyle(color: textSec, fontWeight: FontWeight.bold)),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx); // Close dialog
+                            Navigator.pop(context); // Go back from profile
+                            authController.logout();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          ),
+                          child: const Text("Log Out", style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  );
                 },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444).withOpacity(0.06),
+                  foregroundColor: const Color(0xFFEF4444),
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  side: BorderSide(color: const Color(0xFFEF4444).withOpacity(0.12), width: 1.0),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
@@ -400,11 +770,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
                     SizedBox(width: 8),
                     Text(
-                      "Log Out",
+                      "Log Out Account",
                       style: TextStyle(
                         color: Color(0xFFEF4444),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
                       ),
                     ),
                   ],

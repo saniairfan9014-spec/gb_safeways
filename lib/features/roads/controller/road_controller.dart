@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/services/supabase_client.dart';
+import '../../../core/utils/logger.dart';
 import '../model/road_model.dart';
 
 class RoadController extends ChangeNotifier {
@@ -7,6 +10,7 @@ class RoadController extends ChangeNotifier {
   bool _isLoading = false;
   String _searchQuery = "";
   String _statusFilter = "All"; // 'All', 'Open', 'Caution', 'Blocked'
+  RealtimeChannel? _roadChannel;
 
   List<RoadModel> get roads => _roads;
   bool get isLoading => _isLoading;
@@ -32,91 +36,122 @@ class RoadController extends ChangeNotifier {
     loadRoads();
   }
 
+  /// Load road status. Connects to Supabase backend if active, else falls back cleanly to local mock database conditions.
   Future<void> loadRoads() async {
     _isLoading = true;
     notifyListeners();
 
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 1000));
+    try {
+      List<RoadModel> loadedRoads = [];
 
-    _roads.clear();
-    _roads.addAll([
-      RoadModel(
-        id: 'road-kkh',
-        name: AppStrings.kkh,
-        status: 'Caution',
-        description: 'Partial mudflow blocking one lane near Attabad Lake tunnel. One-way traffic active. Drive slowly.',
-        weather: 'Foggy / Drizzle',
-        safetyRating: 3.5,
-        origin: 'Hassan Abdal',
-        destination: 'Khunjerab Pass (China Border)',
-        distanceKm: 806,
-        lastUpdated: DateTime.now().subtract(const Duration(minutes: 42)),
-      ),
-      RoadModel(
-        id: 'road-skardu',
-        name: AppStrings.skarduRoad,
-        status: 'Blocked',
-        description: 'Major landslide at Shengus. Karakoram Highway junction blocked. Heavy machinery is clearing the debris. Expected open in 8 hours.',
-        weather: 'Heavy Rain',
-        safetyRating: 1.2,
-        origin: 'Jaglot Junction',
-        destination: 'Skardu City',
-        distanceKm: 167,
-        lastUpdated: DateTime.now().subtract(const Duration(minutes: 15)),
-      ),
-      RoadModel(
-        id: 'road-babusar',
-        name: AppStrings.babusarPass,
-        status: 'Blocked',
-        description: 'Seasonally closed due to heavy snow blockages at the summit (4,173m). Use Karakoram Highway via Thakot/Besham instead.',
-        weather: 'Blizzard',
-        safetyRating: 0.5,
-        origin: 'Naran',
-        destination: 'Chilas',
-        distanceKm: 45,
-        lastUpdated: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      RoadModel(
-        id: 'road-astore',
-        name: AppStrings.astorRoad,
-        status: 'Open',
-        description: 'Road is clear and open for all vehicles. Clear visibility across Rama and Astore valley checkpoints.',
-        weather: 'Sunny & Clear',
-        safetyRating: 4.8,
-        origin: 'Thalichi',
-        destination: 'Astore City',
-        distanceKm: 43,
-        lastUpdated: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      RoadModel(
-        id: 'road-ghizer',
-        name: AppStrings.ghizerRoad,
-        status: 'Open',
-        description: 'Road open up to Phander Lake. Shandur Top pass has high winds but is passable for 4x4 vehicles only.',
-        weather: 'Windy',
-        safetyRating: 4.0,
-        origin: 'Gilgit',
-        destination: 'Chitral',
-        distanceKm: 370,
-        lastUpdated: DateTime.now().subtract(const Duration(hours: 5)),
-      ),
-      RoadModel(
-        id: 'road-khunjerab',
-        name: AppStrings.khunjerabPass,
-        status: 'Open',
-        description: 'Khunjerab Pass (4,693m) road is fully cleared. High altitude icy patches between Sost and the border. Winter tires recommended.',
-        weather: 'Very Cold / Sunny',
-        safetyRating: 4.2,
-        origin: 'Sost',
-        destination: 'Khunjerab Top',
-        distanceKm: 85,
-        lastUpdated: DateTime.now().subtract(const Duration(hours: 1)),
-      ),
-    ]);
+      // 1. Try to fetch from Supabase if initialized
+      if (SupabaseService.instance.isInitialized) {
+        AppLogger.info("Fetching roads from Supabase backend...");
+        loadedRoads = await SupabaseService.instance.fetchRoads();
 
-    _isLoading = false;
-    notifyListeners();
+        // Establish real-time subscription for subsequent updates (once)
+        if (_roadChannel == null) {
+          _roadChannel = SupabaseService.instance.subscribeToTableChanges(
+            tableName: 'roads',
+            channelId: 'roads-sync',
+            onEvent: (payload) {
+              AppLogger.info("Supabase Realtime Alert: roads updated. Syncing view...");
+              // Hot-reload list from database when changes occur
+              loadRoads();
+            },
+          );
+        }
+      }
+
+      // 2. Local Fallback/Mock preset data if Supabase offline or not configured
+      if (loadedRoads.isEmpty) {
+        AppLogger.warn("Supabase inactive or returned empty roads. Setting up local mountain presets.");
+        await Future.delayed(const Duration(milliseconds: 600));
+
+        loadedRoads = [
+          RoadModel(
+            id: 'road-kkh',
+            name: AppStrings.kkh,
+            status: 'Caution',
+            description: 'Partial mudflow blocking one lane near Attabad Lake tunnel. One-way traffic active. Drive slowly.',
+            weather: 'Foggy / Drizzle',
+            safetyRating: 3.5,
+            origin: 'Hassan Abdal',
+            destination: 'Khunjerab Pass (China Border)',
+            distanceKm: 806,
+            lastUpdated: DateTime.now().subtract(const Duration(minutes: 42)),
+          ),
+          RoadModel(
+            id: 'road-skardu',
+            name: AppStrings.skarduRoad,
+            status: 'Blocked',
+            description: 'Major landslide at Shengus. Karakoram Highway junction blocked. Heavy machinery is clearing the debris. Expected open in 8 hours.',
+            weather: 'Heavy Rain',
+            safetyRating: 1.2,
+            origin: 'Jaglot Junction',
+            destination: 'Skardu City',
+            distanceKm: 167,
+            lastUpdated: DateTime.now().subtract(const Duration(minutes: 15)),
+          ),
+          RoadModel(
+            id: 'road-babusar',
+            name: AppStrings.babusarPass,
+            status: 'Blocked',
+            description: 'Seasonally closed due to heavy snow blockages at the summit (4,173m). Use Karakoram Highway via Thakot/Besham instead.',
+            weather: 'Blizzard',
+            safetyRating: 0.5,
+            origin: 'Naran',
+            destination: 'Chilas',
+            distanceKm: 45,
+            lastUpdated: DateTime.now().subtract(const Duration(hours: 3)),
+          ),
+          RoadModel(
+            id: 'road-astore',
+            name: AppStrings.astorRoad,
+            status: 'Open',
+            description: 'Road is clear and open for all vehicles. Clear visibility across Rama and Astore valley checkpoints.',
+            weather: 'Sunny & Clear',
+            safetyRating: 4.8,
+            origin: 'Thalichi',
+            destination: 'Astore City',
+            distanceKm: 43,
+            lastUpdated: DateTime.now().subtract(const Duration(hours: 2)),
+          ),
+          RoadModel(
+            id: 'road-ghizer',
+            name: AppStrings.ghizerRoad,
+            status: 'Open',
+            description: 'Road open up to Phander Lake. Shandur Top pass has high winds but is passable for 4x4 vehicles only.',
+            weather: 'Windy',
+            safetyRating: 4.0,
+            origin: 'Gilgit',
+            destination: 'Chitral',
+            distanceKm: 370,
+            lastUpdated: DateTime.now().subtract(const Duration(hours: 5)),
+          ),
+          RoadModel(
+            id: 'road-khunjerab',
+            name: AppStrings.khunjerabPass,
+            status: 'Open',
+            description: 'Khunjerab Pass (4,693m) road is fully cleared. High altitude icy patches between Sost and the border. Winter tires recommended.',
+            weather: 'Very Cold / Sunny',
+            safetyRating: 4.2,
+            origin: 'Sost',
+            destination: 'Khunjerab Top',
+            distanceKm: 85,
+            lastUpdated: DateTime.now().subtract(const Duration(hours: 1)),
+          ),
+        ];
+      }
+
+      _roads.clear();
+      _roads.addAll(loadedRoads);
+    } catch (e) {
+      AppLogger.error("Failed to load roads status", e);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   void updateSearchQuery(String query) {
@@ -129,7 +164,30 @@ class RoadController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateRoadStatus(String roadId, String newStatus, String newDescription, String newWeather, double safetyRating) {
+  /// Update road safety status. Syncs dynamically to backend database, falling back to local memory immediately.
+  Future<void> updateRoadStatus(
+    String roadId,
+    String newStatus,
+    String newDescription,
+    String newWeather,
+    double safetyRating,
+  ) async {
+    // 1. Sync update to Supabase public.roads table if connected
+    if (SupabaseService.instance.isInitialized) {
+      try {
+        await SupabaseService.instance.updateRoadStatus(
+          roadId: roadId,
+          status: newStatus,
+          description: newDescription,
+          weather: newWeather,
+          safetyRating: safetyRating,
+        );
+      } catch (e) {
+        AppLogger.warn("Supabase road update failed due to connection. Syncing locally first.");
+      }
+    }
+
+    // 2. Perform immediate local memory sync
     final index = _roads.indexWhere((road) => road.id == roadId);
     if (index != -1) {
       _roads[index] = _roads[index].copyWith(
@@ -141,5 +199,13 @@ class RoadController extends ChangeNotifier {
       );
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    if (_roadChannel != null) {
+      SupabaseService.instance.unsubscribeChannel(_roadChannel);
+    }
+    super.dispose();
   }
 }

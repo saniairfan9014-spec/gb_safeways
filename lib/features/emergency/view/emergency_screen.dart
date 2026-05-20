@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../shared/widgets/custom_button.dart';
+import '../../auth/controller/auth_controller.dart';
 import '../controller/emergency_controller.dart';
 
 class EmergencyScreen extends StatelessWidget {
@@ -44,7 +45,23 @@ class EmergencyScreen extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              controller.startSosTriggerFlow();
+              final currentUser = context.read<AuthController>().currentUser;
+              
+              // Map the screen human-readable type to the DB-supported enum values ('rescue' | 'ambulance' | 'police' | 'medical')
+              String dbType = 'rescue';
+              if (type.contains("Accident")) {
+                dbType = 'ambulance';
+              } else if (type.contains("Medical")) {
+                dbType = 'medical';
+              } else if (type.contains("Police")) {
+                dbType = 'police';
+              }
+              
+              controller.startSosTriggerFlow(
+                user: currentUser,
+                type: dbType,
+                message: "Critical distress signal: $type",
+              );
             },
             child: const Text("Confirm SOS", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -379,7 +396,10 @@ class EmergencyScreen extends StatelessWidget {
         children: [
           // 1. Concentric Circular Glowing SOS Button
           GestureDetector(
-            onTap: () => controller.startSosTriggerFlow(),
+            onTap: () {
+              final currentUser = context.read<AuthController>().currentUser;
+              controller.startSosTriggerFlow(user: currentUser);
+            },
             child: Container(
               width: 150,
               height: 150,

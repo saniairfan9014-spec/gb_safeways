@@ -69,37 +69,34 @@ class ReportModel {
     return {
       'id': id,
       'user_id': userId,
-      'user_name': userName,
-      'user_avatar': userAvatar,
       'road_id': roadId,
-      'road_name': roadName,
-      'hazard_type': hazardType,
-      'description': description,
-      'severity': severity,
-      'latitude': latitude,
-      'longitude': longitude,
-      'upvotes': upvotes,
-      'is_resolved': isResolved,
+      'message': description,
+      'image': userAvatar.startsWith('http') ? userAvatar : '',
+      'location': '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}',
+      'status': isResolved ? 'verified' : 'pending',
       'created_at': createdAt.toIso8601String(),
     };
   }
 
   factory ReportModel.fromJson(Map<String, dynamic> json) {
+    final userData = json['users'] as Map<String, dynamic>?;
+    final roadData = json['roads'] as Map<String, dynamic>?;
+
     return ReportModel(
       id: json['id'] as String,
-      userId: json['user_id'] as String,
-      userName: json['user_name'] as String,
-      userAvatar: json['user_avatar'] as String,
-      roadId: json['road_id'] as String,
-      roadName: json['road_name'] as String,
-      hazardType: json['hazard_type'] as String,
-      description: json['description'] as String,
-      severity: json['severity'] as String,
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
+      userId: json['user_id'] as String? ?? '',
+      userName: json['user_name'] as String? ?? userData?['name'] as String? ?? 'Traveler',
+      userAvatar: json['user_avatar'] as String? ?? userData?['avatar'] as String? ?? 'https://ui-avatars.com/api/?name=Traveler&background=0284C7&color=fff&bold=true',
+      roadId: json['road_id'] as String? ?? '',
+      roadName: json['road_name'] as String? ?? roadData?['name'] as String? ?? 'Road',
+      hazardType: json['hazard_type'] as String? ?? 'Hazard',
+      description: json['message'] as String? ?? json['description'] as String? ?? '',
+      severity: json['severity'] as String? ?? 'Medium',
+      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : 35.9208,
+      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : 74.3089,
       upvotes: json['upvotes'] as int? ?? 0,
-      isResolved: json['is_resolved'] as bool? ?? false,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      isResolved: json['is_resolved'] as bool? ?? (json['status'] == 'verified' || json['status'] == 'rejected'),
+      createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
     );
   }
 }

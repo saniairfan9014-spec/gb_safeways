@@ -9,10 +9,14 @@ import '../model/user_model.dart';
 class AuthController extends ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
+  int _reportsCount = 0;
+  int _emergenciesCount = 0;
   
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
+  int get reportsCount => _currentUser?.contributionsCount ?? _reportsCount;
+  int get emergenciesCount => _emergenciesCount;
 
   AuthController() {
     _loadSession();
@@ -29,6 +33,7 @@ class AuthController extends ChangeNotifier {
       if (hasSession) {
         final email = prefs.getString('user_email') ?? 'traveler@karakoram.com';
         final name = prefs.getString('user_name') ?? 'Karakoram Adventurer';
+        final phone = prefs.getString('user_phone') ?? '+92 355 4567890';
         final contributions = prefs.getInt('user_contributions') ?? 3;
         final badge = _calculateBadge(contributions);
 
@@ -37,11 +42,13 @@ class AuthController extends ChangeNotifier {
           email: email,
           fullName: name,
           avatarUrl: AppHelpers.getRandomAvatarUrl(name),
+          phoneNumber: phone,
           contributionsCount: contributions,
           badge: badge,
           createdAt: DateTime.now().subtract(const Duration(days: 15)),
         );
         AppLogger.success("Session loaded: ${_currentUser!.fullName}");
+        loadUserStats();
       }
     } catch (e) {
       AppLogger.error("Failed to load local session", e);
@@ -55,9 +62,6 @@ class AuthController extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 1500));
-
     try {
       if (email.isEmpty || password.isEmpty) {
         throw Exception("Please fill in all fields.");
@@ -67,25 +71,43 @@ class AuthController extends ChangeNotifier {
         throw Exception("Invalid credentials. Password must be at least 6 characters.");
       }
 
-      // Handle Mock login success
-      final name = email.split('@')[0].toUpperCase();
-      _currentUser = UserModel(
-        id: 'mock-uuid-1234',
-        email: email,
-        fullName: name,
-        avatarUrl: AppHelpers.getRandomAvatarUrl(name),
-        contributionsCount: 4,
-        badge: _calculateBadge(4),
-        createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      );
+      UserModel? userProfile;
+      // 1. Attempt Supabase Login first if active
+      if (SupabaseService.instance.isInitialized) {
+        AppLogger.info("Attempting Supabase backend login...");
+        userProfile = await SupabaseService.instance.login(email: email, password: password);
+      }
+
+      // 2. Local Fallback simulation if Supabase is disabled or offline
+      if (userProfile == null) {
+        AppLogger.warn("Supabase auth offline/inactive. Simulating fallback session.");
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        final name = email.split('@')[0].toUpperCase();
+        const phone = '+92 355 4567890';
+        userProfile = UserModel(
+          id: 'mock-uuid-1234',
+          email: email,
+          fullName: name,
+          avatarUrl: AppHelpers.getRandomAvatarUrl(name),
+          phoneNumber: phone,
+          contributionsCount: 4,
+          badge: _calculateBadge(4),
+          createdAt: DateTime.now().subtract(const Duration(days: 30)),
+        );
+      }
+
+      _currentUser = userProfile;
+      loadUserStats();
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('has_session', true);
-      await prefs.setString('user_email', email);
-      await prefs.setString('user_name', name);
-      await prefs.setInt('user_contributions', 4);
+      await prefs.setString('user_email', _currentUser!.email);
+      await prefs.setString('user_name', _currentUser!.fullName);
+      await prefs.setString('user_phone', _currentUser!.phoneNumber);
+      await prefs.setInt('user_contributions', _currentUser!.contributionsCount);
 
-      NotificationService.instance.showSuccessSnackbar("Welcome, traveler $name!");
+      NotificationService.instance.showSuccessSnackbar("Welcome, traveler ${_currentUser!.fullName}!");
       return true;
     } catch (e) {
       NotificationService.instance.showErrorSnackbar(e.toString().replaceAll("Exception: ", ""));
@@ -100,8 +122,6 @@ class AuthController extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 1800));
-
     try {
       if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
         throw Exception("Please fill in all fields.");
@@ -110,23 +130,46 @@ class AuthController extends ChangeNotifier {
         throw Exception("Password must be at least 6 characters.");
       }
 
-      _currentUser = UserModel(
-        id: 'mock-uuid-${DateTime.now().millisecondsSinceEpoch}',
-        email: email,
-        fullName: fullName,
-        avatarUrl: AppHelpers.getRandomAvatarUrl(fullName),
-        contributionsCount: 0,
-        badge: _calculateBadge(0),
-        createdAt: DateTime.now(),
-      );
+      UserModel? userProfile;
+      // 1. Attempt Supabase sign up first
+      if (SupabaseService.instance.isInitialized) {
+        AppLogger.info("Attempting Supabase backend signup...");
+        userProfile = await SupabaseService.instance.signUp(
+          fullName: fullName,
+          email: email,
+          password: password,
+        );
+      }
+
+      // 2. Local Fallback simulation
+      if (userProfile == null) {
+        AppLogger.warn("Supabase auth offline/inactive. Simulating fallback signup.");
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        const phone = '+92 355 4567890';
+        userProfile = UserModel(
+          id: 'mock-uuid-${DateTime.now().millisecondsSinceEpoch}',
+          email: email,
+          fullName: fullName,
+          avatarUrl: AppHelpers.getRandomAvatarUrl(fullName),
+          phoneNumber: phone,
+          contributionsCount: 0,
+          badge: _calculateBadge(0),
+          createdAt: DateTime.now(),
+        );
+      }
+
+      _currentUser = userProfile;
+      loadUserStats();
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('has_session', true);
-      await prefs.setString('user_email', email);
-      await prefs.setString('user_name', fullName);
-      await prefs.setInt('user_contributions', 0);
+      await prefs.setString('user_email', _currentUser!.email);
+      await prefs.setString('user_name', _currentUser!.fullName);
+      await prefs.setString('user_phone', _currentUser!.phoneNumber);
+      await prefs.setInt('user_contributions', _currentUser!.contributionsCount);
 
-      NotificationService.instance.showSuccessSnackbar("Account created! Welcome to GB Safeway.");
+      NotificationService.instance.showSuccessSnackbar("Account created! Welcome to GB SafeRoute.");
       return true;
     } catch (e) {
       NotificationService.instance.showErrorSnackbar(e.toString().replaceAll("Exception: ", ""));
@@ -138,6 +181,9 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (SupabaseService.instance.isInitialized) {
+      await SupabaseService.instance.logout();
+    }
     _currentUser = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -163,6 +209,33 @@ class AuthController extends ChangeNotifier {
     NotificationService.instance.showSuccessSnackbar(
       "Report submitted! Points: $newCount. Rank: $newBadge 🎉"
     );
+  }
+
+  Future<void> loadUserStats() async {
+    if (_currentUser == null) return;
+
+    if (!SupabaseService.instance.isInitialized) {
+      _reportsCount = _currentUser!.contributionsCount;
+      _emergenciesCount = 2;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final stats = await SupabaseService.instance.fetchUserStats(_currentUser!.id);
+      _reportsCount = stats['reports'] ?? 0;
+      _emergenciesCount = stats['emergencies'] ?? 0;
+
+      // Sync contributionsCount and badge in current user
+      _currentUser = _currentUser!.copyWith(
+        contributionsCount: _reportsCount,
+        badge: _calculateBadge(_reportsCount),
+      );
+
+      notifyListeners();
+    } catch (e) {
+      AppLogger.warn("Failed to load dynamic user stats from Supabase: $e");
+    }
   }
 
   String _calculateBadge(int contributions) {

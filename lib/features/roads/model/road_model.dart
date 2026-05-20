@@ -55,12 +55,9 @@ class RoadModel {
       'name': name,
       'status': status,
       'description': description,
-      'weather': weather,
-      'safety_rating': safetyRating,
-      'origin': origin,
-      'destination': destination,
-      'distance_km': distanceKm,
-      'last_updated': lastUpdated.toIso8601String(),
+      'from_location': origin,
+      'to_location': destination,
+      'updated_at': lastUpdated.toIso8601String(),
     };
   }
 
@@ -68,14 +65,14 @@ class RoadModel {
     return RoadModel(
       id: json['id'] as String,
       name: json['name'] as String,
-      status: json['status'] as String,
-      description: json['description'] as String,
-      weather: json['weather'] as String,
-      safetyRating: (json['safety_rating'] as num).toDouble(),
-      origin: json['origin'] as String,
-      destination: json['destination'] as String,
-      distanceKm: json['distance_km'] as int,
-      lastUpdated: DateTime.parse(json['last_updated'] as String),
+      status: json['status'] as String? ?? 'open',
+      description: json['description'] as String? ?? '',
+      weather: json['weather'] as String? ?? 'Clear',
+      safetyRating: json['safety_rating'] != null ? (json['safety_rating'] as num).toDouble() : 4.5,
+      origin: json['from_location'] as String? ?? json['origin'] as String? ?? 'Origin',
+      destination: json['to_location'] as String? ?? json['destination'] as String? ?? 'Destination',
+      distanceKm: json['distance_km'] as int? ?? 100,
+      lastUpdated: DateTime.parse(json['updated_at'] as String? ?? json['last_updated'] as String? ?? DateTime.now().toIso8601String()),
     );
   }
 }
