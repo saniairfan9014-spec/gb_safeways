@@ -64,82 +64,9 @@ class ReportController extends ChangeNotifier {
         }
       }
 
-      // 2. Local Fallback/Mock reports if offline or uninitialized
-      if (loadedReports.isEmpty) {
-        AppLogger.warn("Supabase reports returning empty or inactive. Setting up mock presets.");
-        await Future.delayed(const Duration(milliseconds: 600));
+      // 2. Local Fallback/Mock reports removed to only show database data as requested.
 
-        loadedReports = [
-          ReportModel(
-            id: 'report-1',
-            userId: 'uuid-sherpa',
-            userName: 'Local Sherpa (Sher Ali)',
-            userAvatar: 'https://ui-avatars.com/api/?name=Sher+Ali&background=0284C7&color=fff&bold=true',
-            roadId: 'road-skardu',
-            roadName: 'Jaglot-Skardu Road (S-1)',
-            hazardType: 'Landslide',
-            description: 'Huge boulders rolled down at Shengus point. Blocked both lanes. GBDMA crew is arriving soon. Avoid this route.',
-            severity: 'High',
-            latitude: 35.4389,
-            longitude: 74.8011,
-            upvotes: 24,
-            isResolved: false,
-            createdAt: DateTime.now().subtract(const Duration(minutes: 45)),
-          ),
-          ReportModel(
-            id: 'report-2',
-            userId: 'uuid-hiker',
-            userName: 'Zahid Hunzai',
-            userAvatar: 'https://ui-avatars.com/api/?name=Zahid+Hunzai&background=10B981&color=fff&bold=true',
-            roadId: 'road-kkh',
-            roadName: 'Karakoram Highway (N-35)',
-            hazardType: 'Rockfall / Shooting Stones',
-            description: 'Shooting stones reported near Haldeikish (Hunza). Minor dent on one vehicle. Rocks are still falling sporadically. Drive with caution!',
-            severity: 'Medium',
-            latitude: 36.3214,
-            longitude: 74.6719,
-            upvotes: 15,
-            isResolved: false,
-            createdAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 20)),
-          ),
-          ReportModel(
-            id: 'report-3',
-            userId: 'uuid-driver',
-            userName: 'Awan Transport',
-            userAvatar: 'https://ui-avatars.com/api/?name=Awan+Transport&background=F59E0B&color=fff&bold=true',
-            roadId: 'road-astore',
-            roadName: 'Astore Valley Road',
-            hazardType: 'Mudslide / Flooding',
-            description: 'Water stream (Nallah) overflowing on the road near Gorikot due to rapid snowmelt. Safe for SUVs but small cars should wait.',
-            severity: 'Low',
-            latitude: 35.2891,
-            longitude: 74.9124,
-            upvotes: 8,
-            isResolved: false,
-            createdAt: DateTime.now().subtract(const Duration(hours: 4)),
-          ),
-        ];
-      }
-
-      // 3. Local Fallback/Mock alerts
-      if (loadedAlerts.isEmpty) {
-        loadedAlerts = [
-          AlertModel(
-            id: 'alert-1',
-            title: 'High Altitude Blizzard Notice',
-            message: 'Heavy winds and zero visibility reported near Babusar Pass summit. All travelers are advised to bypass Naran-Chilas route.',
-            severity: 'Danger',
-            createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-          ),
-          AlertModel(
-            id: 'alert-2',
-            title: 'Landslide Warning Skardu S-1',
-            message: 'Active shooting stones near Shengus. GBDMA recommends avoiding travel on Jaglot-Skardu road until dawn.',
-            severity: 'Warning',
-            createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-          ),
-        ];
-      }
+      // 3. Local Fallback/Mock alerts removed to only show database data as requested.
 
       _reports.clear();
       _reports.addAll(loadedReports);

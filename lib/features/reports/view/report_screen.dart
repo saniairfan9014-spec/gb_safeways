@@ -160,6 +160,43 @@ class _ReportScreenState extends State<ReportScreen> {
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
+                      
+                      // Animated Custom Road Name Input field (if selected "Other / Custom Road")
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.fastOutSlowIn,
+                        child: _selectedRoadId == 'road-other'
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    "Custom Route / Valley Name",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: _customRoadController,
+                                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                                    decoration: const InputDecoration(
+                                      hintText: "e.g. Nagar Valley Road, Hunza-Shimshal Road",
+                                      prefixIcon: Icon(Icons.edit_road_rounded, color: AppColors.textMuted, size: 18),
+                                    ),
+                                    validator: (value) {
+                                      if (_selectedRoadId == 'road-other' && (value == null || value.trim().isEmpty)) {
+                                        return "Please specify the custom road name";
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                       const SizedBox(height: 20),
 
                       // Select Hazard Dropdown
