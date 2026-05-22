@@ -17,6 +17,7 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
+  final _customRoadController = TextEditingController();
   
   String? _selectedRoadId;
   String _selectedHazard = AppStrings.hazardLandslide;
@@ -26,6 +27,7 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   void dispose() {
     _descriptionController.dispose();
+    _customRoadController.dispose();
     super.dispose();
   }
 
@@ -35,11 +37,21 @@ class _ReportScreenState extends State<ReportScreen> {
       final roadController = context.read<RoadController>();
       final reportController = context.read<ReportController>();
 
-      final selectedRoad = roadController.roads.firstWhere((r) => r.id == _selectedRoadId);
+      String roadId;
+      String roadName;
+
+      if (_selectedRoadId == 'road-other') {
+        roadId = 'road-other';
+        roadName = _customRoadController.text.trim();
+      } else {
+        final selectedRoad = roadController.roads.firstWhere((r) => r.id == _selectedRoadId);
+        roadId = selectedRoad.id;
+        roadName = selectedRoad.name;
+      }
 
       final success = await reportController.submitReport(
-        roadId: selectedRoad.id,
-        roadName: selectedRoad.name,
+        roadId: roadId,
+        roadName: roadName,
         hazardType: _selectedHazard,
         description: _descriptionController.text.trim(),
         severity: _selectedSeverity,
@@ -49,6 +61,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
       if (success && mounted) {
         _descriptionController.clear();
+        _customRoadController.clear();
         setState(() {
           _selectedRoadId = null;
           _selectedHazard = AppStrings.hazardLandslide;

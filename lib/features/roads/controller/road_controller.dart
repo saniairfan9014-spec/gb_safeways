@@ -49,6 +49,41 @@ class RoadController extends ChangeNotifier {
         AppLogger.info("Fetching roads from Supabase backend...");
         loadedRoads = await SupabaseService.instance.fetchRoads();
 
+        // Check if 'road-other' exists. If not, dynamically insert/upsert it to avoid foreign key violations.
+        final hasOther = loadedRoads.any((r) => r.id == 'road-other');
+        if (!hasOther && SupabaseService.instance.client != null) {
+          try {
+            await SupabaseService.instance.client!.from('roads').upsert({
+              'id': 'road-other',
+              'name': 'Other / Custom Road',
+              'status': 'Open',
+              'description': 'Custom/Other reported valley roads and highways.',
+              'weather': 'Clear',
+              'safety_rating': 5.0,
+              'origin': 'Various',
+              'destination': 'Various',
+              'distance_km': 0,
+              'last_updated': DateTime.now().toUtc().toIso8601String(),
+            });
+            
+            // Add to the fetched list
+            loadedRoads.add(RoadModel(
+              id: 'road-other',
+              name: 'Other / Custom Road',
+              status: 'Open',
+              description: 'Custom/Other reported valley roads and highways.',
+              weather: 'Clear',
+              safetyRating: 5.0,
+              origin: 'Various',
+              destination: 'Various',
+              distanceKm: 0,
+              lastUpdated: DateTime.now(),
+            ));
+          } catch (e) {
+            AppLogger.warn("Failed to dynamically upsert 'road-other' to Supabase: $e");
+          }
+        }
+
         // Establish real-time subscription for subsequent updates (once)
         if (_roadChannel == null) {
           _roadChannel = SupabaseService.instance.subscribeToTableChanges(
@@ -69,6 +104,18 @@ class RoadController extends ChangeNotifier {
         await Future.delayed(const Duration(milliseconds: 600));
 
         loadedRoads = [
+          RoadModel(
+            id: 'road-other',
+            name: 'Other / Custom Road',
+            status: 'Open',
+            description: 'Custom/Other reported valley roads and highways.',
+            weather: 'Clear',
+            safetyRating: 5.0,
+            origin: 'Various',
+            destination: 'Various',
+            distanceKm: 0,
+            lastUpdated: DateTime.now(),
+          ),
           RoadModel(
             id: 'road-kkh',
             name: AppStrings.kkh,
