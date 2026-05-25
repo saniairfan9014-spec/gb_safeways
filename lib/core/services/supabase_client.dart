@@ -194,7 +194,70 @@ class SupabaseService {
       rethrow;
     }
   }
+  // =====================================================================
+  // COMMUNITY ROAD APIs
+  // =====================================================================
 
+  /// Submit a user‑created road (unverified by default)
+  Future<RoadModel?> submitCustomRoad(RoadModel road) async {
+    if (!_isInitialized || client == null) return null;
+
+    try {
+      final Map<String, dynamic> payload = road.toJson();
+      // Ensure community flags
+      payload['is_verified'] = false;
+      payload['created_by'] = road.createdBy;
+
+      final List<dynamic> response = await client!
+          .from('roads')
+          .insert(payload)
+          .select()
+          .timeout(const Duration(seconds: 6));
+
+      if (response.isNotEmpty) {
+        return RoadModel.fromJson(response.first);
+      }
+      return null;
+    } catch (e) {
+      AppLogger.error('Failed to submit custom road', e);
+      rethrow;
+    }
+  }
+
+  /// Verify a pending community road (admin only)
+  Future<void> verifyRoad(String roadId) async {
+    if (!_isInitialized || client == null) return;
+
+    try {
+      await client!.from('roads').update({
+        'is_verified': true,
+      }).eq('id', roadId).timeout(const Duration(seconds: 5));
+      AppLogger.success('Road $roadId verified');
+    } catch (e) {
+      AppLogger.error('Failed to verify road $roadId', e);
+      rethrow;
+    }
+  }
+
+  /// Reject a pending community road (admin only) – optional hard delete
+  Future<void> rejectRoad(String roadId, {bool hardDelete = false}) async {
+    if (!_isInitialized || client == null) return;
+
+    try {
+      if (hardDelete) {
+        await client!.from('roads').delete().eq('id', roadId).timeout(const Duration(seconds: 5));
+        AppLogger.success('Road $roadId permanently deleted');
+      } else {
+        await client!.from('roads').update({
+          'is_verified': false,
+        }).eq('id', roadId).timeout(const Duration(seconds: 5));
+        AppLogger.info('Road $roadId marked as rejected');
+      }
+    } catch (e) {
+      AppLogger.error('Failed to reject road $roadId', e);
+      rethrow;
+    }
+  }
   // =====================================================================
   // HAZARD REPORTS APIS
   // =====================================================================

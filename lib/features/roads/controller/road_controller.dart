@@ -9,6 +9,7 @@ class RoadController extends ChangeNotifier {
   bool _isLoading = false;
   String _searchQuery = "";
   String _statusFilter = "All"; // 'All', 'Open', 'Caution', 'Blocked'
+  bool _showCommunity = false; // false = only verified roads
   RealtimeChannel? _roadChannel;
 
   List<RoadModel> get roads => _roads;
@@ -25,7 +26,9 @@ class RoadController extends ChangeNotifier {
       final matchesFilter = _statusFilter == "All" ||
           road.status.toLowerCase() == _statusFilter.toLowerCase();
 
-      return matchesSearch && matchesFilter;
+      final matchesVerification = _showCommunity ? true : road.isVerified;
+
+      return matchesSearch && matchesFilter && matchesVerification;
     }).toList();
   }
 
@@ -74,6 +77,8 @@ class RoadController extends ChangeNotifier {
               origin: 'Various',
               destination: 'Various',
               distanceKm: 0,
+              isVerified: true,
+              createdBy: '',
               lastUpdated: DateTime.now(),
             ));
           } catch (e) {
@@ -99,17 +104,19 @@ class RoadController extends ChangeNotifier {
       if (loadedRoads.isEmpty) {
         loadedRoads = [
           RoadModel(
-            id: 'road-other',
-            name: 'Other / Custom Road',
-            status: 'Open',
-            description: 'Custom/Other reported valley roads and highways.',
-            weather: 'Clear',
-            safetyRating: 5.0,
-            origin: 'Various',
-            destination: 'Various',
-            distanceKm: 0,
-            lastUpdated: DateTime.now(),
-          ),
+              id: 'road-other',
+              name: 'Other / Custom Road',
+              status: 'Open',
+              description: 'Custom/Other reported valley roads and highways.',
+              weather: 'Clear',
+              safetyRating: 5.0,
+              origin: 'Various',
+              destination: 'Various',
+              distanceKm: 0,
+              isVerified: true,
+              createdBy: '',
+              lastUpdated: DateTime.now(),
+            ),
         ];
       }
 
@@ -128,9 +135,28 @@ class RoadController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setShowCommunity(bool show) {
+    _showCommunity = show;
+    notifyListeners();
+  }
+
   void setFilter(String filter) {
     _statusFilter = filter;
     notifyListeners();
+  }
+
+  /// Submit a new community road (unverified) on behalf of the current user.
+  Future<void> submitRoad(RoadModel road) async {
+    // Ensure required fields are set
+    final userId = SupabaseService.instance.client?.auth.currentUser?.id ?? '';
+    final roadToSubmit = road.copyWith(
+      isVerified: false,
+      createdBy: userId,
+    );
+
+    await SupabaseService.instance.submitCustomRoad(roadToSubmit);
+    // Refresh list after submission
+    await loadRoads();
   }
 
   /// Update road safety status. Syncs dynamically to backend database, falling back to local memory immediately.

@@ -9,6 +9,8 @@ class RoadModel {
   final String destination;
   final int distanceKm;
   final DateTime lastUpdated;
+  final bool isVerified;
+  final String createdBy;
 
   RoadModel({
     required this.id,
@@ -20,6 +22,8 @@ class RoadModel {
     required this.origin,
     required this.destination,
     required this.distanceKm,
+    required this.isVerified,
+    required this.createdBy,
     required this.lastUpdated,
   });
 
@@ -33,6 +37,8 @@ class RoadModel {
     String? origin,
     String? destination,
     int? distanceKm,
+    bool? isVerified,
+    String? createdBy,
     DateTime? lastUpdated,
   }) {
     return RoadModel(
@@ -45,6 +51,8 @@ class RoadModel {
       origin: origin ?? this.origin,
       destination: destination ?? this.destination,
       distanceKm: distanceKm ?? this.distanceKm,
+      isVerified: isVerified ?? this.isVerified,
+      createdBy: createdBy ?? this.createdBy,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
@@ -62,6 +70,8 @@ class RoadModel {
       'weather': weather,
       'safety_rating': safetyRating,
       'distance_km': distanceKm,
+      'is_verified': isVerified,
+      'created_by': createdBy,
       'last_updated': lastUpdated.toIso8601String(),
       'updated_at': lastUpdated.toIso8601String(),
     };
@@ -78,6 +88,8 @@ class RoadModel {
       origin: json['from_location'] as String? ?? json['origin'] as String? ?? 'Origin',
       destination: json['to_location'] as String? ?? json['destination'] as String? ?? 'Destination',
       distanceKm: json['distance_km'] as int? ?? 100,
+      isVerified: json['is_verified'] as bool? ?? false,
+      createdBy: json['created_by'] as String? ?? '',
       lastUpdated: DateTime.parse(json['updated_at'] as String? ?? json['last_updated'] as String? ?? DateTime.now().toIso8601String()),
     );
   }
