@@ -11,7 +11,11 @@ class SupabaseService {
   static final SupabaseService instance = SupabaseService._();
   SupabaseService._();
 
+
+
   bool _isInitialized = false;
+
+
 
   bool get isInitialized => _isInitialized;
 
@@ -27,6 +31,9 @@ class SupabaseService {
     if (url == null || anonKey == null || url.isEmpty || anonKey.isEmpty) {
       AppLogger.warn("Supabase credentials not provided. Running in LOCAL MOCK MODE.");
       _isInitialized = false;
+
+
+
       return;
     }
 

@@ -24,7 +24,8 @@ class AppRoutes {
       
       case RouteNames.signup:
         return MaterialPageRoute(builder: (_) => const SignupScreen());
-      
+
+
       case RouteNames.home:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
 
