@@ -6,6 +6,7 @@ import '../../auth/controller/auth_controller.dart';
 import '../../reports/controller/report_controller.dart';
 import '../../emergency/controller/emergency_controller.dart';
 import '../../../routes/route_names.dart';
+import '../../reports/view/admin_reports_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -708,6 +709,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
                       onTap: () => _showPrivacySettingsSheet(context, isLight),
+                    ),
+                    Divider(color: borderCol, height: 1, thickness: 1),
+
+                    // Admin Verification Portal Row
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.admin_panel_settings_outlined, color: Color(0xFF10B981), size: 18),
+                      ),
+                      title: Text(
+                        "Admin Verification Portal",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
+                      ),
+                      subtitle: const Text(
+                        "Review hazard alerts and change highway status",
+                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AdminReportsScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

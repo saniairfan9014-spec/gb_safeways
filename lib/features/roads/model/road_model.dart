@@ -55,8 +55,14 @@ class RoadModel {
       'name': name,
       'status': status,
       'description': description,
+      'origin': origin,
+      'destination': destination,
       'from_location': origin,
       'to_location': destination,
+      'weather': weather,
+      'safety_rating': safetyRating,
+      'distance_km': distanceKm,
+      'last_updated': lastUpdated.toIso8601String(),
       'updated_at': lastUpdated.toIso8601String(),
     };
   }

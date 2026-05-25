@@ -18,6 +18,7 @@ class _ReportScreenState extends State<ReportScreen> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _customRoadController = TextEditingController();
+  final _imageUrlController = TextEditingController();
   
   String? _selectedRoadId;
   String _selectedHazard = AppStrings.hazardLandslide;
@@ -28,6 +29,7 @@ class _ReportScreenState extends State<ReportScreen> {
   void dispose() {
     _descriptionController.dispose();
     _customRoadController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
@@ -55,6 +57,7 @@ class _ReportScreenState extends State<ReportScreen> {
         hazardType: _selectedHazard,
         description: _descriptionController.text.trim(),
         severity: _selectedSeverity,
+        imageUrl: _imageUrlController.text.trim().isNotEmpty ? _imageUrlController.text.trim() : null,
         authController: authController,
         roadController: roadController,
       );
@@ -62,6 +65,7 @@ class _ReportScreenState extends State<ReportScreen> {
       if (success && mounted) {
         _descriptionController.clear();
         _customRoadController.clear();
+        _imageUrlController.clear();
         setState(() {
           _selectedRoadId = null;
           _selectedHazard = AppStrings.hazardLandslide;
@@ -301,6 +305,67 @@ class _ReportScreenState extends State<ReportScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      // Photo Attachment / Hazard Image
+                      const Text(
+                        "Attach Hazard Photo (Optional)",
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _imageUrlController,
+                        style: const TextStyle(fontSize: 13, color: Colors.white),
+                        decoration: const InputDecoration(
+                          hintText: "Paste an image URL or choose a template below...",
+                          prefixIcon: Icon(Icons.link_rounded, color: AppColors.textMuted, size: 18),
+                        ),
+                        onChanged: (val) {
+                          setState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Preset template thumbnails
+                      Row(
+                        children: [
+                          _buildPresetImageChip(
+                            label: "Landslide",
+                            url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80",
+                          ),
+                          const SizedBox(width: 8),
+                          _buildPresetImageChip(
+                            label: "Snow Pass",
+                            url: "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80",
+                          ),
+                          const SizedBox(width: 8),
+                          _buildPresetImageChip(
+                            label: "Rockfall",
+                            url: "https://images.unsplash.com/photo-1518098268026-4e43a1a009de?auto=format&fit=crop&w=400&q=80",
+                          ),
+                          const SizedBox(width: 8),
+                          _buildPresetImageChip(
+                            label: "Traffic",
+                            url: "https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80",
+                          ),
+                        ],
+                      ),
+                      
+                      // Live Image Preview if filled
+                      if (_imageUrlController.text.trim().isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          height: 140,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                            image: DecorationImage(
+                              image: NetworkImage(_imageUrlController.text.trim()),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+
                       // Location coordinates tagging card
                       Row(
                         children: [
@@ -336,6 +401,40 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetImageChip({required String label, required String url}) {
+    final isSelected = _imageUrlController.text.trim() == url;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _imageUrlController.text = url;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : AppColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? Colors.white : AppColors.border,
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
             ),
           ),
         ),

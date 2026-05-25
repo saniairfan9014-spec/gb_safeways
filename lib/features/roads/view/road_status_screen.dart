@@ -221,6 +221,10 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
       activeBg = const Color(0xFF10B981); // Emerald Green
       inactiveBg = isLight ? const Color(0xFFE6F4EA) : const Color(0xFF064E3B).withOpacity(0.3);
       inactiveFg = const Color(0xFF10B981);
+    } else if (label == "Blocked") {
+      activeBg = const Color(0xFF334155); // Dark Slate Blue
+      inactiveBg = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
+      inactiveFg = isLight ? const Color(0xFF475569) : const Color(0xFF94A3B8);
     } else { // Closed
       activeBg = const Color(0xFFEF4444); // Crimson Red
       inactiveBg = isLight ? const Color(0xFFFCE8E6) : const Color(0xFF7F1D1D).withOpacity(0.3);
@@ -338,13 +342,17 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
                   _buildFilterButton("All", roadController.statusFilter == "All", () {
                     roadController.setFilter("All");
                   }, isLight),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   _buildFilterButton("Open", roadController.statusFilter == "Open", () {
                     roadController.setFilter("Open");
                   }, isLight),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   _buildFilterButton("Closed", roadController.statusFilter == "Closed", () {
                     roadController.setFilter("Closed");
+                  }, isLight),
+                  const SizedBox(width: 8),
+                  _buildFilterButton("Blocked", roadController.statusFilter == "Blocked", () {
+                    roadController.setFilter("Blocked");
                   }, isLight),
                 ],
               ),
@@ -354,28 +362,38 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
               Expanded(
                 child: roadController.isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : roadController.filteredRoads.isEmpty
-                        ? EmptyState(
-                            title: "No Routes Found",
-                            description: "Try adjusting your search criteria or filters.",
-                            icon: Icons.directions_off_rounded,
-                            onAction: () {
-                              _searchController.clear();
-                              roadController.updateSearchQuery("");
-                              roadController.setFilter("All");
-                            },
-                            actionText: "Reset Filters",
-                          )
-                        : ListView.builder(
-                            itemCount: roadController.filteredRoads.length,
-                            itemBuilder: (context, index) {
-                              final road = roadController.filteredRoads[index];
-                              return RoadCard(
-                                road: road,
-                                onTap: () => _showRoadDetailsSheet(context, road),
-                              );
-                            },
-                          ),
+                    : RefreshIndicator(
+                        onRefresh: () => roadController.loadRoads(),
+                        child: roadController.filteredRoads.isEmpty
+                            ? ListView(
+                                children: [
+                                  SizedBox(
+                                    height: MediaQuery.of(context).size.height * 0.5,
+                                    child: EmptyState(
+                                      title: "No Routes Found",
+                                      description: "Try adjusting your search criteria or filters.",
+                                      icon: Icons.directions_off_rounded,
+                                      onAction: () {
+                                        _searchController.clear();
+                                        roadController.updateSearchQuery("");
+                                        roadController.setFilter("All");
+                                      },
+                                      actionText: "Reset Filters",
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ListView.builder(
+                                itemCount: roadController.filteredRoads.length,
+                                itemBuilder: (context, index) {
+                                  final road = roadController.filteredRoads[index];
+                                  return RoadCard(
+                                    road: road,
+                                    onTap: () => _showRoadDetailsSheet(context, road),
+                                  );
+                                },
+                              ),
+                      ),
               ),
             ],
           ),

@@ -88,6 +88,7 @@ class ReportController extends ChangeNotifier {
     required String hazardType,
     required String description,
     required String severity,
+    String? imageUrl,
     required AuthController authController,
     required RoadController roadController,
   }) async {
@@ -134,17 +135,17 @@ class ReportController extends ChangeNotifier {
         longitude: lng,
         upvotes: 0,
         isResolved: false,
+        status: 'pending',
+        imageUrl: imageUrl,
         createdAt: DateTime.now(),
       );
 
-      bool syncSuccess = false;
       ReportModel? dbReport;
 
       // 1. Write to Supabase if active
       if (SupabaseService.instance.isInitialized) {
         try {
           dbReport = await SupabaseService.instance.submitReport(newReport);
-          syncSuccess = dbReport != null;
         } catch (e) {
           AppLogger.warn("Supabase report submission failed due to connection. Saving locally.");
         }
@@ -156,25 +157,6 @@ class ReportController extends ChangeNotifier {
 
       // Award community contributor points
       authController.incrementContribution();
-
-      // Automatically adjust safety status in RoadController
-      String newRoadStatus = 'Caution';
-      double safetyRating = 3.0;
-      if (severity == 'High') {
-        newRoadStatus = 'Blocked';
-        safetyRating = 1.0;
-      } else if (severity == 'Medium') {
-        newRoadStatus = 'Caution';
-        safetyRating = 2.5;
-      }
-
-      await roadController.updateRoadStatus(
-        roadId,
-        newRoadStatus,
-        "$hazardType alert: $description",
-        "Unsettled",
-        safetyRating,
-      );
 
       // Broadcast alert banner
       NotificationService.instance.showWarningBanner(
@@ -214,6 +196,116 @@ class ReportController extends ChangeNotifier {
     }
   }
 
+  /// Verify an active safety report and automatically adjust road status (Admin Workflow)
+  Future<bool> verifyReport({
+    required ReportModel report,
+    required String newRoadStatus,
+    required RoadController roadController,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // 1. Sync status update to Supabase
+      if (SupabaseService.instance.isInitialized) {
+        await SupabaseService.instance.updateReportStatus(
+          reportId: report.id,
+          status: 'verified',
+        );
+      }
+
+      // 2. Update locally in the list
+      final index = _reports.indexWhere((r) => r.id == report.id);
+      if (index != -1) {
+        _reports[index] = _reports[index].copyWith(
+          status: 'verified',
+          isResolved: true,
+        );
+      }
+
+      // 3. Automatically adjust road safety status based on verified status
+      double safetyRating = 4.8;
+      String roadWeather = "Clear";
+      String roadDesc = "Previously reported hazard (${report.hazardType}) has been verified and resolved by Admin.";
+
+      final statusLower = newRoadStatus.toLowerCase();
+      if (statusLower == 'blocked') {
+        safetyRating = 1.0;
+        roadWeather = "Severe";
+        roadDesc = "BLOCKED: Verified ${report.hazardType}. ${report.description}";
+      } else if (statusLower == 'closed') {
+        safetyRating = 0.5;
+        roadWeather = "Adverse";
+        roadDesc = "CLOSED: Verified ${report.hazardType}. ${report.description}";
+      } else if (statusLower == 'slow' || statusLower == 'caution') {
+        safetyRating = 2.5;
+        roadWeather = "Cautionary";
+        roadDesc = "SLOW TRAFFIC: Verified ${report.hazardType}. ${report.description}";
+      } else if (statusLower == 'under_construction') {
+        safetyRating = 3.0;
+        roadWeather = "Variable";
+        roadDesc = "UNDER CONSTRUCTION: Verified ${report.hazardType}. ${report.description}";
+      } else {
+        newRoadStatus = "Open";
+      }
+
+      await roadController.updateRoadStatus(
+        report.roadId,
+        newRoadStatus,
+        roadDesc,
+        roadWeather,
+        safetyRating,
+      );
+
+      NotificationService.instance.showSuccessSnackbar(
+        "Report verified! Road status updated to $newRoadStatus.",
+      );
+      return true;
+    } catch (e) {
+      AppLogger.error("Failed to verify report", e);
+      NotificationService.instance.showErrorSnackbar("Failed to verify report: ${e.toString()}");
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Reject a false or duplicate hazard report (Admin Workflow)
+  Future<bool> rejectReport({required String reportId}) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // 1. Sync to Supabase if active
+      if (SupabaseService.instance.isInitialized) {
+        await SupabaseService.instance.updateReportStatus(
+          reportId: reportId,
+          status: 'rejected',
+        );
+      }
+
+      // 2. Update locally
+      final index = _reports.indexWhere((r) => r.id == reportId);
+      if (index != -1) {
+        _reports[index] = _reports[index].copyWith(
+          status: 'rejected',
+          isResolved: true,
+        );
+      }
+
+      NotificationService.instance.showSuccessSnackbar("Report rejected successfully.");
+      return true;
+    } catch (e) {
+      AppLogger.error("Failed to reject report", e);
+      NotificationService.instance.showErrorSnackbar("Failed to reject report: ${e.toString()}");
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   /// Mark a report as resolved once the hazard is cleared
   Future<void> resolveReport(String reportId, RoadController roadController) async {
     final index = _reports.indexWhere((r) => r.id == reportId);
@@ -230,13 +322,13 @@ class ReportController extends ChangeNotifier {
       }
 
       // 2. Update locally
-      _reports[index] = report.copyWith(isResolved: true);
+      _reports[index] = report.copyWith(isResolved: true, status: 'verified');
       
       // Update road safety back to safe status once cleared
       await roadController.updateRoadStatus(
         report.roadId,
         'Open',
-        'Previously reported blockage ($reportId) has been cleared. Drive safely.',
+        'Previously reported blockage has been cleared. Drive safely.',
         'Clear',
         4.8,
       );

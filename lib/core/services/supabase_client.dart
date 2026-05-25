@@ -279,6 +279,25 @@ class SupabaseService {
     }
   }
 
+  /// Update an active report's status (pending/verified/rejected)
+  Future<void> updateReportStatus({
+    required String reportId,
+    required String status,
+  }) async {
+    if (!_isInitialized || client == null) return;
+
+    try {
+      await client!.from('reports').update({
+        'status': status,
+        'is_resolved': status == 'verified' || status == 'rejected',
+      }).eq('id', reportId).timeout(const Duration(seconds: 5));
+      AppLogger.success("Supabase updated report status: $reportId -> $status");
+    } catch (e) {
+      AppLogger.error("Failed to update report status on Supabase", e);
+      rethrow;
+    }
+  }
+
   /// Sync contributor points dynamically in background
   Future<void> _incrementUserContribution(String userId) async {
     if (!_isInitialized || client == null) return;

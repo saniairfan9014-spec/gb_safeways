@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/services/supabase_client.dart';
 import '../../../core/utils/logger.dart';
 import '../model/road_model.dart';
@@ -24,9 +23,7 @@ class RoadController extends ChangeNotifier {
           road.destination.toLowerCase().contains(_searchQuery.toLowerCase());
 
       final matchesFilter = _statusFilter == "All" ||
-          road.status.toLowerCase() == _statusFilter.toLowerCase() ||
-          (_statusFilter == "Closed" && 
-              (road.status.toLowerCase() == "blocked" || road.status.toLowerCase() == "caution"));
+          road.status.toLowerCase() == _statusFilter.toLowerCase();
 
       return matchesSearch && matchesFilter;
     }).toList();

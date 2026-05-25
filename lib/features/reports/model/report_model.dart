@@ -12,6 +12,8 @@ class ReportModel {
   final double longitude;
   final int upvotes;
   final bool isResolved;
+  final String status; // 'pending', 'verified', 'rejected'
+  final String? imageUrl;
   final DateTime createdAt;
 
   ReportModel({
@@ -28,6 +30,8 @@ class ReportModel {
     required this.longitude,
     this.upvotes = 0,
     this.isResolved = false,
+    this.status = 'pending',
+    this.imageUrl,
     required this.createdAt,
   });
 
@@ -45,6 +49,8 @@ class ReportModel {
     double? longitude,
     int? upvotes,
     bool? isResolved,
+    String? status,
+    String? imageUrl,
     DateTime? createdAt,
   }) {
     return ReportModel(
@@ -61,6 +67,8 @@ class ReportModel {
       longitude: longitude ?? this.longitude,
       upvotes: upvotes ?? this.upvotes,
       isResolved: isResolved ?? this.isResolved,
+      status: status ?? this.status,
+      imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -69,11 +77,21 @@ class ReportModel {
     return {
       'id': id,
       'user_id': userId,
+      'user_name': userName,
+      'user_avatar': userAvatar,
       'road_id': roadId,
+      'road_name': roadName,
+      'hazard_type': hazardType,
+      'description': description,
+      'severity': severity,
+      'latitude': latitude,
+      'longitude': longitude,
+      'upvotes': upvotes,
+      'is_resolved': isResolved,
       'message': description,
-      'image': userAvatar.startsWith('http') ? userAvatar : '',
+      'image': imageUrl ?? '',
       'location': '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}',
-      'status': isResolved ? 'verified' : 'pending',
+      'status': status,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -81,6 +99,9 @@ class ReportModel {
   factory ReportModel.fromJson(Map<String, dynamic> json) {
     final userData = json['users'] as Map<String, dynamic>?;
     final roadData = json['roads'] as Map<String, dynamic>?;
+
+    final parsedStatus = json['status'] as String? ?? 'pending';
+    final parsedIsResolved = json['is_resolved'] as bool? ?? (parsedStatus == 'verified' || parsedStatus == 'rejected');
 
     return ReportModel(
       id: json['id'] as String,
@@ -95,7 +116,9 @@ class ReportModel {
       latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : 35.9208,
       longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : 74.3089,
       upvotes: json['upvotes'] as int? ?? 0,
-      isResolved: json['is_resolved'] as bool? ?? (json['status'] == 'verified' || json['status'] == 'rejected'),
+      isResolved: parsedIsResolved,
+      status: parsedStatus,
+      imageUrl: json['image'] as String? ?? json['image_url'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
     );
   }
