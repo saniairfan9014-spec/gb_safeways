@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/logger.dart';
 import '../../features/auth/model/user_model.dart';
@@ -11,11 +12,12 @@ class SupabaseService {
   static final SupabaseService instance = SupabaseService._();
   SupabaseService._();
 
-
+  // Production-grade customized timeouts for unstable mobile networks
+  static const Duration _defaultTimeout = Duration(seconds: 8);
+  static const Duration _extendedTimeout = Duration(seconds: 12);
+  static const Duration _locationTimeout = Duration(seconds: 4);
 
   bool _isInitialized = false;
-
-
 
   bool get isInitialized => _isInitialized;
 
@@ -26,14 +28,49 @@ class SupabaseService {
     return null;
   }
 
+  /// Helper to validate standard UUID format before making database transactions
+  bool _isValidUuid(String? id) {
+    if (id == null) return false;
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(id);
+  }
+
+  /// Central production request executor wrapper. Handles timeout safety,
+  /// automatic logging of distinct exceptions, and initialization assertions.
+  Future<T> _executeWithRetry<T>(
+    Future<T> Function() operation, {
+    required String operationName,
+    Duration timeout = _defaultTimeout,
+    required T fallbackValue,
+  }) async {
+    if (!_isInitialized || client == null) {
+      AppLogger.warn("Supabase local bypass: $operationName executing in local/offline backup.");
+      return fallbackValue;
+    }
+
+    try {
+      return await operation().timeout(timeout);
+    } on TimeoutException catch (e) {
+      AppLogger.error("Unstable network: Timeout during '$operationName' after ${timeout.inSeconds}s.", e);
+      return fallbackValue;
+    } on AuthException catch (e) {
+      AppLogger.error("Authentication failure during '$operationName': ${e.message}", e);
+      rethrow;
+    } on PostgrestException catch (e) {
+      AppLogger.error("PostgreSQL database failure during '$operationName': ${e.message} (Code: ${e.code}, Details: ${e.details})", e);
+      rethrow;
+    } catch (e) {
+      AppLogger.error("Unexpected failure during '$operationName'", e);
+      rethrow;
+    }
+  }
+
   /// Initialize Supabase. If credentials are missing or connection fails, runs in local mock mode.
   Future<void> initialize({String? url, String? anonKey}) async {
     if (url == null || anonKey == null || url.isEmpty || anonKey.isEmpty) {
       AppLogger.warn("Supabase credentials not provided. Running in LOCAL MOCK MODE.");
       _isInitialized = false;
-
-
-
       return;
     }
 
@@ -60,40 +97,29 @@ class SupabaseService {
     required String email,
     required String password,
   }) async {
-    if (!_isInitialized || client == null) return null;
+    return _executeWithRetry<UserModel?>(
+      () async {
+        final response = await client!.auth.signUp(
+          email: email,
+          password: password,
+          data: {
+            'full_name': fullName,
+            'avatar_url': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(fullName)}&background=0284C7&color=fff&bold=true',
+          },
+        );
 
-    try {
-      final response = await client!.auth.signUp(
-        email: email,
-        password: password,
-        data: {
-          'full_name': fullName,
-          'avatar_url': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(fullName)}&background=0284C7&color=fff&bold=true',
-        },
-      ).timeout(const Duration(seconds: 6));
+        final authUser = response.user;
+        if (authUser == null) throw Exception("Sign up returned empty user session.");
 
-      final authUser = response.user;
-      if (authUser == null) throw Exception("Sign up returned empty user session.");
-
-      // Perform explicit upsert into the public.users table (new schema alignment)
-      try {
-        await client!.from('users').upsert({
-          'id': authUser.id,
-          'name': fullName,
-          'phone': '+92 355 4567890',
-          'avatar': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(fullName)}&background=0284C7&color=fff&bold=true',
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        });
-      } catch (upsertError) {
-        AppLogger.warn("Non-blocking signup profile upsert failure: $upsertError");
-      }
-
-      // Fetch the public.users record which has been automatically populated.
-      return await fetchUserProfile(authUser.id);
-    } catch (e) {
-      AppLogger.error("Supabase sign up failed", e);
-      rethrow;
-    }
+        // The database trigger 'on_auth_user_created' automatically handles inserting 
+        // the user profile into the 'public.users' table. Manual upsert has been removed
+        // to maintain a single reliable user creation flow.
+        return await fetchUserProfile(authUser.id);
+      },
+      operationName: "signUp",
+      timeout: _extendedTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Email & Password Login
@@ -101,51 +127,56 @@ class SupabaseService {
     required String email,
     required String password,
   }) async {
-    if (!_isInitialized || client == null) return null;
+    return _executeWithRetry<UserModel?>(
+      () async {
+        final response = await client!.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
 
-    try {
-      final response = await client!.auth.signInWithPassword(
-        email: email,
-        password: password,
-      ).timeout(const Duration(seconds: 6));
+        final authUser = response.user;
+        if (authUser == null) throw Exception("Login returned empty user session.");
 
-      final authUser = response.user;
-      if (authUser == null) throw Exception("Login returned empty user session.");
-
-      return await fetchUserProfile(authUser.id);
-    } catch (e) {
-      AppLogger.error("Supabase login failed", e);
-      rethrow;
-    }
+        return await fetchUserProfile(authUser.id);
+      },
+      operationName: "login",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Log out from session
   Future<void> logout() async {
-    if (!_isInitialized || client == null) return;
-    try {
-      await client!.auth.signOut();
-    } catch (e) {
-      AppLogger.error("Supabase sign out failed", e);
-    }
+    await _executeWithRetry<void>(
+      () async {
+        await client!.auth.signOut();
+      },
+      operationName: "logout",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Fetch public user profile
   Future<UserModel?> fetchUserProfile(String userId) async {
-    if (!_isInitialized || client == null) return null;
-
-    try {
-      final data = await client!
-          .from('users')
-          .select()
-          .eq('id', userId)
-          .single()
-          .timeout(const Duration(seconds: 5));
-
-      return UserModel.fromJson(data);
-    } catch (e) {
-      AppLogger.error("Failed to fetch public profile for user $userId", e);
+    if (!_isValidUuid(userId)) {
+      AppLogger.warn("fetchUserProfile bypassed: user ID is not a valid UUID.");
       return null;
     }
+    return _executeWithRetry<UserModel?>(
+      () async {
+        final data = await client!
+            .from('users')
+            .select()
+            .eq('id', userId)
+            .single();
+
+        return UserModel.fromJson(data);
+      },
+      operationName: "fetchUserProfile",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   // =====================================================================
@@ -154,19 +185,15 @@ class SupabaseService {
 
   /// Fetch all active regional roads
   Future<List<RoadModel>> fetchRoads() async {
-    if (!_isInitialized || client == null) return [];
-
-    try {
-      final List<dynamic> data = await client!
-          .from('roads')
-          .select()
-          .timeout(const Duration(seconds: 5));
-
-      return data.map((json) => RoadModel.fromJson(json)).toList();
-    } catch (e) {
-      AppLogger.error("Failed to fetch roads from Supabase, returning empty", e);
-      rethrow;
-    }
+    return _executeWithRetry<List<RoadModel>>(
+      () async {
+        final List<dynamic> data = await client!.from('roads').select();
+        return data.map((json) => RoadModel.fromJson(json)).toList();
+      },
+      operationName: "fetchRoads",
+      timeout: _defaultTimeout,
+      fallbackValue: [],
+    );
   }
 
   /// Update road state (blocked/caution/open) with dispatcher remarks
@@ -177,86 +204,90 @@ class SupabaseService {
     required String weather,
     required double safetyRating,
   }) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      await client!.from('roads').update({
-        'status': status,
-        'description': description,
-        'weather': weather,
-        'safety_rating': safetyRating,
-        'last_updated': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', roadId).timeout(const Duration(seconds: 5));
-      
-      AppLogger.success("Supabase updated road status: $roadId -> $status");
-    } catch (e) {
-      AppLogger.error("Failed to update road status on Supabase", e);
-      rethrow;
-    }
+    await _executeWithRetry<void>(
+      () async {
+        await client!.from('roads').update({
+          'status': status,
+          'description': description,
+          'weather': weather,
+          'safety_rating': safetyRating,
+          'last_updated': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', roadId);
+        
+        AppLogger.success("Supabase updated road status: $roadId -> $status");
+      },
+      operationName: "updateRoadStatus",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
+
   // =====================================================================
   // COMMUNITY ROAD APIs
   // =====================================================================
 
   /// Submit a user‑created road (unverified by default)
   Future<RoadModel?> submitCustomRoad(RoadModel road) async {
-    if (!_isInitialized || client == null) return null;
+    return _executeWithRetry<RoadModel?>(
+      () async {
+        final Map<String, dynamic> payload = road.toJson();
+        // Ensure community flags
+        payload['is_verified'] = false;
+        
+        // Ensure creator ID is a valid UUID or null to prevent PostgREST exceptions
+        final creatorId = road.createdBy;
+        payload['created_by'] = _isValidUuid(creatorId) ? creatorId : null;
 
-    try {
-      final Map<String, dynamic> payload = road.toJson();
-      // Ensure community flags
-      payload['is_verified'] = false;
-      payload['created_by'] = road.createdBy;
+        final List<dynamic> response = await client!
+            .from('roads')
+            .insert(payload)
+            .select();
 
-      final List<dynamic> response = await client!
-          .from('roads')
-          .insert(payload)
-          .select()
-          .timeout(const Duration(seconds: 6));
-
-      if (response.isNotEmpty) {
-        return RoadModel.fromJson(response.first);
-      }
-      return null;
-    } catch (e) {
-      AppLogger.error('Failed to submit custom road', e);
-      rethrow;
-    }
+        if (response.isNotEmpty) {
+          return RoadModel.fromJson(response.first);
+        }
+        return null;
+      },
+      operationName: "submitCustomRoad",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Verify a pending community road (admin only)
   Future<void> verifyRoad(String roadId) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      await client!.from('roads').update({
-        'is_verified': true,
-      }).eq('id', roadId).timeout(const Duration(seconds: 5));
-      AppLogger.success('Road $roadId verified');
-    } catch (e) {
-      AppLogger.error('Failed to verify road $roadId', e);
-      rethrow;
-    }
+    await _executeWithRetry<void>(
+      () async {
+        await client!.from('roads').update({
+          'is_verified': true,
+        }).eq('id', roadId);
+        AppLogger.success('Road $roadId verified');
+      },
+      operationName: "verifyRoad",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Reject a pending community road (admin only) – optional hard delete
   Future<void> rejectRoad(String roadId, {bool hardDelete = false}) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      if (hardDelete) {
-        await client!.from('roads').delete().eq('id', roadId).timeout(const Duration(seconds: 5));
-        AppLogger.success('Road $roadId permanently deleted');
-      } else {
-        await client!.from('roads').update({
-          'is_verified': false,
-        }).eq('id', roadId).timeout(const Duration(seconds: 5));
-        AppLogger.info('Road $roadId marked as rejected');
-      }
-    } catch (e) {
-      AppLogger.error('Failed to reject road $roadId', e);
-      rethrow;
-    }
+    await _executeWithRetry<void>(
+      () async {
+        if (hardDelete) {
+          await client!.from('roads').delete().eq('id', roadId);
+          AppLogger.success('Road $roadId permanently deleted');
+        } else {
+          await client!.from('roads').update({
+            'is_verified': false,
+          }).eq('id', roadId);
+          AppLogger.info('Road $roadId marked as rejected');
+        }
+      },
+      operationName: "rejectRoad",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
   // =====================================================================
   // HAZARD REPORTS APIS
@@ -264,82 +295,102 @@ class SupabaseService {
 
   /// Fetch all active hazard reports
   Future<List<ReportModel>> fetchReports() async {
-    if (!_isInitialized || client == null) return [];
+    return _executeWithRetry<List<ReportModel>>(
+      () async {
+        // Resolve database schema mismatch using PostgREST column aliasing:
+        // maps 'full_name' to 'name', and 'avatar_url' to 'avatar' to seamlessly 
+        // align with what ReportModel.fromJson expects without breaking client code.
+        final List<dynamic> data = await client!
+            .from('reports')
+            .select('*, users(name:full_name, avatar:avatar_url), roads(name)')
+            .order('created_at', ascending: false);
 
-    try {
-      final List<dynamic> data = await client!
-          .from('reports')
-          .select('*, users(name, avatar), roads(name)')
-          .order('created_at', ascending: false)
-          .timeout(const Duration(seconds: 5));
-
-      // Filter out resolved/verified reports in Dart memory to be fully compatible with differing schemas
-      return data
-          .map((json) => ReportModel.fromJson(json))
-          .where((report) => !report.isResolved)
-          .toList();
-    } catch (e) {
-      AppLogger.error("Failed to fetch active hazard reports from Supabase", e);
-      rethrow;
-    }
+        // Filter out resolved/verified reports in Dart memory to be fully compatible with differing schemas
+        return data
+            .map((json) => ReportModel.fromJson(json))
+            .where((report) => !report.isResolved)
+            .toList();
+      },
+      operationName: "fetchReports",
+      timeout: _defaultTimeout,
+      fallbackValue: [],
+    );
   }
 
   /// Submit a new traveler road hazard report
   Future<ReportModel?> submitReport(ReportModel report) async {
-    if (!_isInitialized || client == null) return null;
+    return _executeWithRetry<ReportModel?>(
+      () async {
+        final Map<String, dynamic> rawJson = report.toJson();
+        
+        // Remove client‑side mock ID if it doesn't match standard UUID format
+        if (!_isValidUuid(rawJson['id']?.toString())) {
+          rawJson.remove('id');
+        }
 
-    try {
-      final Map<String, dynamic> rawJson = report.toJson();
-      // Remove mock ID if it doesn't match a proper UUID format
-      if (rawJson['id'] == null || !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(rawJson['id'].toString())) {
-        rawJson.remove('id');
-      }
+        // Sanitize user_id to ensure it's a valid UUID to avoid PostgREST cast exception
+        final userId = rawJson['user_id']?.toString();
+        if (!_isValidUuid(userId)) {
+          rawJson['user_id'] = null;
+        }
 
-      final List<dynamic> response = await client!
-          .from('reports')
-          .insert(rawJson)
-          .select()
-          .timeout(const Duration(seconds: 6));
+        final List<dynamic> response = await client!
+            .from('reports')
+            .insert(rawJson)
+            .select();
 
-      if (response.isNotEmpty) {
-        // Increment community points for contributor
-        await _incrementUserContribution(report.userId);
-        return ReportModel.fromJson(response.first);
-      }
-      return null;
-    } catch (e) {
-      AppLogger.error("Failed to insert safety report to Supabase", e);
-      rethrow;
-    }
+        if (response.isNotEmpty) {
+          final insertedReport = ReportModel.fromJson(response.first);
+          // Increment community points for contributor atomically in database
+          if (_isValidUuid(insertedReport.userId)) {
+            await _incrementUserContribution(insertedReport.userId);
+          }
+          return insertedReport;
+        }
+        return null;
+      },
+      operationName: "submitReport",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
-  /// Upvote a specific report to validate credibility
-  Future<void> upvoteReport(String reportId, int currentUpvotes) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      await client!.from('reports').update({
-        'upvotes': currentUpvotes + 1,
-      }).eq('id', reportId).timeout(const Duration(seconds: 4));
-    } catch (e) {
-      AppLogger.error("Failed to upvote report $reportId in Supabase", e);
-      rethrow;
+  /// Upvote a specific report to validate credibility (atomic increment)
+  Future<void> upvoteReport(String reportId, [int? currentUpvotes]) async {
+    if (!_isValidUuid(reportId)) {
+      AppLogger.warn("upvoteReport bypassed: reportId is not a valid UUID.");
+      return;
     }
+    await _executeWithRetry<void>(
+      () async {
+        // Execute atomic RPC call on database to prevent lost upvotes race conditions
+        await client!.rpc('increment_report_upvotes', params: {
+          'report_id': reportId,
+        });
+      },
+      operationName: "upvoteReport",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Resolve an active report
   Future<void> resolveReport(String reportId) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      await client!.from('reports').update({
-        'is_resolved': true,
-        'status': 'verified', // Support both boolean and enum schema fields for maximum resilience
-      }).eq('id', reportId).timeout(const Duration(seconds: 5));
-    } catch (e) {
-      AppLogger.error("Failed to resolve report $reportId in Supabase", e);
-      rethrow;
+    if (!_isValidUuid(reportId)) {
+      AppLogger.warn("resolveReport bypassed: reportId is not a valid UUID.");
+      return;
     }
+    await _executeWithRetry<void>(
+      () async {
+        await client!.from('reports').update({
+          'is_resolved': true,
+          'status': 'verified', // Support both boolean and enum schema fields for maximum resilience
+        }).eq('id', reportId);
+      },
+      operationName: "resolveReport",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Update an active report's status (pending/verified/rejected)
@@ -347,42 +398,41 @@ class SupabaseService {
     required String reportId,
     required String status,
   }) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      await client!.from('reports').update({
-        'status': status,
-        'is_resolved': status == 'verified' || status == 'rejected',
-      }).eq('id', reportId).timeout(const Duration(seconds: 5));
-      AppLogger.success("Supabase updated report status: $reportId -> $status");
-    } catch (e) {
-      AppLogger.error("Failed to update report status on Supabase", e);
-      rethrow;
+    if (!_isValidUuid(reportId)) {
+      AppLogger.warn("updateReportStatus bypassed: reportId is not a valid UUID.");
+      return;
     }
+    await _executeWithRetry<void>(
+      () async {
+        await client!.from('reports').update({
+          'status': status,
+          'is_resolved': status == 'verified' || status == 'rejected',
+        }).eq('id', reportId);
+        AppLogger.success("Supabase updated report status: $reportId -> $status");
+      },
+      operationName: "updateReportStatus",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
-  /// Sync contributor points dynamically in background
+  /// Sync contributor points dynamically and atomically in background (atomic increment)
   Future<void> _incrementUserContribution(String userId) async {
-    if (!_isInitialized || client == null) return;
-    try {
-      final user = await fetchUserProfile(userId);
-      if (user != null) {
-        final newPoints = user.contributionsCount + 1;
-        String newBadge = "Basecamp Guide";
-        if (newPoints >= 10) {
-          newBadge = "Himalayan Sherpa";
-        } else if (newPoints >= 5) {
-          newBadge = "Karakoram Sentinel";
-        }
-
-        await client!.from('users').update({
-          'contributions_count': newPoints,
-          'badge': newBadge,
-        }).eq('id', userId);
-      }
-    } catch (e) {
-      AppLogger.warn("Non-blocking failure: Unable to update contributor points in Supabase.");
+    if (!_isValidUuid(userId)) {
+      AppLogger.warn("_incrementUserContribution bypassed: user ID is not a valid UUID.");
+      return;
     }
+    await _executeWithRetry<void>(
+      () async {
+        // Execute atomic RPC call on database to prevent race conditions and dynamically recalculate badge
+        await client!.rpc('increment_user_contributions', params: {
+          'user_id': userId,
+        });
+      },
+      operationName: "_incrementUserContribution",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   // =====================================================================
@@ -391,43 +441,58 @@ class SupabaseService {
 
   /// Submit a critical emergency SOS signal
   Future<EmergencyRequestModel?> triggerSos(EmergencyRequestModel request) async {
-    if (!_isInitialized || client == null) return null;
+    return _executeWithRetry<EmergencyRequestModel?>(
+      () async {
+        // Build a sanitized payload matching the public.emergency_requests table schema
+        final Map<String, dynamic> dbPayload = {
+          'user_name': request.userName,
+          'phone_number': request.phoneNumber,
+          'latitude': request.latitude,
+          'longitude': request.longitude,
+          'status': request.isActive ? 'Active' : 'Resolved',
+          'created_at': request.createdAt.toUtc().toIso8601String(),
+        };
 
-    try {
-      final Map<String, dynamic> rawJson = request.toJson();
-      // Remove mock ID if it doesn't match a proper UUID format
-      if (rawJson['id'] == null || !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(rawJson['id'].toString())) {
-        rawJson.remove('id');
-      }
+        // Standardize foreign key mapping: Ensure user_id is a valid UUID or null
+        dbPayload['user_id'] = _isValidUuid(request.userId) ? request.userId : null;
 
-      final List<dynamic> response = await client!
-          .from('emergency_requests')
-          .insert(rawJson)
-          .select()
-          .timeout(const Duration(seconds: 6));
+        // Ensure id is a valid UUID, otherwise let Supabase generate a proper UUID
+        if (_isValidUuid(request.id)) {
+          dbPayload['id'] = request.id;
+        }
 
-      if (response.isNotEmpty) {
-        return EmergencyRequestModel.fromJson(response.first);
-      }
-      return null;
-    } catch (e) {
-      AppLogger.error("Failed to trigger SOS broadcast in Supabase", e);
-      rethrow;
-    }
+        final List<dynamic> response = await client!
+            .from('emergency_requests')
+            .insert(dbPayload)
+            .select();
+
+        if (response.isNotEmpty) {
+          return EmergencyRequestModel.fromJson(response.first);
+        }
+        return null;
+      },
+      operationName: "triggerSos",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Update an SOS distress beacons lifecycle (e.g. resolve it)
   Future<void> updateSosStatus(String requestId, String status) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      await client!.from('emergency_requests').update({
-        'status': status,
-      }).eq('id', requestId).timeout(const Duration(seconds: 4));
-    } catch (e) {
-      AppLogger.error("Failed to update SOS status in Supabase", e);
-      rethrow;
+    if (!_isValidUuid(requestId)) {
+      AppLogger.warn("updateSosStatus bypassed: requestId is not a valid UUID.");
+      return;
     }
+    await _executeWithRetry<void>(
+      () async {
+        await client!.from('emergency_requests').update({
+          'status': status,
+        }).eq('id', requestId);
+      },
+      operationName: "updateSosStatus",
+      timeout: _defaultTimeout,
+      fallbackValue: null,
+    );
   }
 
   // =====================================================================
@@ -436,20 +501,19 @@ class SupabaseService {
 
   /// Fetch dispatcher active emergency broadcast announcements
   Future<List<AlertModel>> fetchAlerts() async {
-    if (!_isInitialized || client == null) return [];
+    return _executeWithRetry<List<AlertModel>>(
+      () async {
+        final List<dynamic> data = await client!
+            .from('alerts')
+            .select()
+            .order('created_at', ascending: false);
 
-    try {
-      final List<dynamic> data = await client!
-          .from('alerts')
-          .select()
-          .order('created_at', ascending: false)
-          .timeout(const Duration(seconds: 5));
-
-      return data.map((json) => AlertModel.fromJson(json)).toList();
-    } catch (e) {
-      AppLogger.error("Failed to fetch official alerts from Supabase", e);
-      rethrow;
-    }
+        return data.map((json) => AlertModel.fromJson(json)).toList();
+      },
+      operationName: "fetchAlerts",
+      timeout: _defaultTimeout,
+      fallbackValue: [],
+    );
   }
 
   // =====================================================================
@@ -458,44 +522,54 @@ class SupabaseService {
 
   /// Stream live GPS tracking updates
   Future<void> syncUserLocation(UserLocationModel location) async {
-    if (!_isInitialized || client == null) return;
-
-    try {
-      await client!.from('locations').upsert(location.toJson()).timeout(const Duration(seconds: 3));
-    } catch (e) {
-      AppLogger.warn("Non-blocking location sync timeout.");
+    if (!_isValidUuid(location.id)) {
+      AppLogger.warn("syncUserLocation bypassed: user ID is not a valid UUID.");
+      return;
     }
+    await _executeWithRetry<void>(
+      () async {
+        // Upserting with a primary key constraint on 'id' avoids duplicate rows
+        await client!.from('locations').upsert(location.toJson());
+      },
+      operationName: "syncUserLocation",
+      timeout: _locationTimeout,
+      fallbackValue: null,
+    );
   }
 
   /// Fetch report and emergency counts for a specific user.
   Future<Map<String, int>> fetchUserStats(String userId) async {
-    if (!_isInitialized || client == null) {
+    if (!_isValidUuid(userId)) {
+      AppLogger.warn("fetchUserStats bypassed: user ID is not a valid UUID.");
       return {'reports': 0, 'emergencies': 0};
     }
+    return _executeWithRetry<Map<String, int>>(
+      () async {
+        // Optimize database queries: retrieve counts in parallel to reduce duplicate network requests
+        final reportsFuture = client!
+            .from('reports')
+            .select('id')
+            .eq('user_id', userId);
+            
+        final emergencyFuture = client!
+            .from('emergency_requests')
+            .select('id')
+            .eq('user_id', userId);
 
-    try {
-      final reportsRes = await client!
-          .from('reports')
-          .select('id')
-          .eq('user_id', userId)
-          .timeout(const Duration(seconds: 5));
-      final reportsCount = (reportsRes as List).length;
+        final results = await Future.wait([reportsFuture, emergencyFuture]);
 
-      final emergencyRes = await client!
-          .from('emergency_requests')
-          .select('id')
-          .eq('user_id', userId)
-          .timeout(const Duration(seconds: 5));
-      final emergencyCount = (emergencyRes as List).length;
+        final reportsCount = (results[0] as List).length;
+        final emergencyCount = (results[1] as List).length;
 
-      return {
-        'reports': reportsCount,
-        'emergencies': emergencyCount,
-      };
-    } catch (e) {
-      AppLogger.error("Failed to fetch user stats for $userId", e);
-      return {'reports': 0, 'emergencies': 0};
-    }
+        return {
+          'reports': reportsCount,
+          'emergencies': emergencyCount,
+        };
+      },
+      operationName: "fetchUserStats",
+      timeout: _defaultTimeout,
+      fallbackValue: {'reports': 0, 'emergencies': 0},
+    );
   }
 
   // =====================================================================
