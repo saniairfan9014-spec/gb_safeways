@@ -590,7 +590,7 @@ class EmergencyScreen extends StatelessWidget {
             ],
           ),
           child: Column(
-            mainAxisAlignment: Main => mainCenter,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
