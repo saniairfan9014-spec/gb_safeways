@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/supabase_client.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../auth/controller/auth_controller.dart';
+import '../../home/model/location_model.dart';
 import '../controller/emergency_controller.dart';
 
 class EmergencyScreen extends StatelessWidget {
@@ -12,34 +14,39 @@ class EmergencyScreen extends StatelessWidget {
 
   // Action helper to broadcast specific type of emergency
   void _triggerSpecificEmergency(BuildContext context, String type, EmergencyController controller) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
+    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
+    final cardBg = isLight ? Colors.white : AppColors.surface;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+            const Icon(Icons.warning_amber_rounded, color: AppColors.statusDanger),
             const SizedBox(width: 8),
             Text(
               "Report $type",
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrim),
             ),
           ],
         ),
         content: Text(
           "Are you sure you want to broadcast a distress signal for a '$type' emergency? "
           "This will immediately transmit your GPS coordinates to GBDMA rescue rooms.",
-          style: const TextStyle(color: Color(0xFF475569), fontSize: 14),
+          style: TextStyle(color: textSec, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Color(0xFF64748B))),
+            child: Text("Cancel", style: TextStyle(color: textSec)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AppColors.statusDanger,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
@@ -47,6 +54,11 @@ class EmergencyScreen extends StatelessWidget {
               Navigator.pop(ctx);
               final currentUser = context.read<AuthController>().currentUser;
               
+              if (currentUser == null) {
+                NotificationService.instance.showErrorSnackbar("You must be logged in to broadcast distress beacons.");
+                return;
+              }
+
               // Map the screen human-readable type to the DB-supported enum values ('rescue' | 'ambulance' | 'police' | 'medical')
               String dbType = 'rescue';
               if (type.contains("Accident")) {
@@ -71,10 +83,33 @@ class EmergencyScreen extends StatelessWidget {
   }
 
   Future<void> _shareLiveLocation(BuildContext context) async {
+    final currentUser = context.read<AuthController>().currentUser;
+    
+    if (currentUser == null) {
+      NotificationService.instance.showErrorSnackbar("You must be signed in to share live tracking coordinates.");
+      return;
+    }
+
     final location = await LocationService.instance.getCurrentLocation();
-    String coords = "Lat: 35.9208, Lng: 74.3089 (Gilgit)";
-    if (location != null) {
-      coords = "Lat: ${location.latitude.toStringAsFixed(4)}, Lng: ${location.longitude.toStringAsFixed(4)}";
+    if (location == null) {
+      NotificationService.instance.showErrorSnackbar("Unable to fetch current location. Check GPS settings.");
+      return;
+    }
+
+    final coords = "Lat: ${location.latitude.toStringAsFixed(4)}, Lng: ${location.longitude.toStringAsFixed(4)}";
+
+    if (SupabaseService.instance.isInitialized) {
+      final locModel = UserLocationModel(
+        id: currentUser.id,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        lastUpdated: DateTime.now(),
+      );
+      try {
+        await SupabaseService.instance.syncUserLocation(locModel);
+      } catch (e) {
+        // Suppress background mobile network errors
+      }
     }
     NotificationService.instance.showSuccessSnackbar("📍 Coordinates shared: $coords. Emergency dispatchers updated.");
   }
@@ -128,10 +163,10 @@ class EmergencyScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withOpacity(0.1),
+                      color: AppColors.statusDanger.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.emergency_rounded, color: Color(0xFFEF4444), size: 24),
+                    child: const Icon(Icons.emergency_rounded, color: AppColors.statusDanger, size: 24),
                   ),
                 ],
               ),
@@ -157,7 +192,7 @@ class EmergencyScreen extends StatelessWidget {
                     context: context,
                     icon: Icons.terrain_rounded,
                     label: "Landslide\nBlockage",
-                    color: const Color(0xFFEF4444),
+                    color: AppColors.statusDanger,
                     onTap: () => _triggerSpecificEmergency(context, "Landslide Blockage", controller),
                     isLight: isLight,
                   ),
@@ -166,7 +201,7 @@ class EmergencyScreen extends StatelessWidget {
                     context: context,
                     icon: Icons.car_crash_rounded,
                     label: "Road\nAccident",
-                    color: const Color(0xFFEF4444),
+                    color: AppColors.statusDanger,
                     onTap: () => _triggerSpecificEmergency(context, "Road Accident", controller),
                     isLight: isLight,
                   ),
@@ -175,7 +210,7 @@ class EmergencyScreen extends StatelessWidget {
                     context: context,
                     icon: Icons.medical_services_rounded,
                     label: "Medical\nCare",
-                    color: const Color(0xFFEF4444),
+                    color: AppColors.statusDanger,
                     onTap: () => _triggerSpecificEmergency(context, "Medical Emergency", controller),
                     isLight: isLight,
                   ),
@@ -218,10 +253,10 @@ class EmergencyScreen extends StatelessWidget {
                       leading: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0284C7).withOpacity(0.12),
+                          color: AppColors.primaryDark.withOpacity(0.12),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(contact.icon, color: const Color(0xFF0284C7), size: 22),
+                        child: Icon(contact.icon, color: AppColors.primaryDark, size: 22),
                       ),
                       title: Text(
                         contact.name,
@@ -237,20 +272,24 @@ class EmergencyScreen extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE2E8F0),
+                            color: isLight ? const Color(0xFFE2E8F0) : AppColors.surfaceElevated,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.phone_rounded, color: Color(0xFF0F172A), size: 14),
-                              SizedBox(width: 4),
+                            children: [
+                              Icon(
+                                Icons.phone_rounded, 
+                                color: isLight ? const Color(0xFF0F172A) : AppColors.textPrimary, 
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
                               Text(
                                 "Call",
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A),
+                                  color: isLight ? const Color(0xFF0F172A) : AppColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -278,24 +317,26 @@ class EmergencyScreen extends StatelessWidget {
     Color cardBg,
     Color borderCol,
   ) {
+    final primaryHelpline = controller.contacts.isNotEmpty ? controller.contacts.first.phone : "1122";
+
     if (controller.isSosActivating) {
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFFF59E0B).withOpacity(0.08),
+          color: AppColors.statusCaution.withOpacity(0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5), width: 2),
+          border: Border.all(color: AppColors.statusCaution.withOpacity(0.5), width: 2),
         ),
         child: Column(
           children: [
             const Text(
               "ACTIVATING EMERGENCY SOS",
-              style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF59E0B), fontSize: 16, letterSpacing: 0.5),
+              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.statusCaution, fontSize: 16, letterSpacing: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
               "${controller.sosCountdown}",
-              style: const TextStyle(fontSize: 72, fontWeight: FontWeight.w900, color: Color(0xFFF59E0B)),
+              style: const TextStyle(fontSize: 72, fontWeight: FontWeight.w900, color: AppColors.statusCaution),
             ),
             const SizedBox(height: 16),
             Text(
@@ -318,12 +359,12 @@ class EmergencyScreen extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withOpacity(0.08),
+          color: AppColors.statusDanger.withOpacity(0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.5), width: 2),
+          border: Border.all(color: AppColors.statusDanger.withOpacity(0.5), width: 2),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFEF4444).withOpacity(0.1),
+              color: AppColors.statusDanger.withOpacity(0.1),
               blurRadius: 20,
               spreadRadius: 4,
             ),
@@ -334,15 +375,15 @@ class EmergencyScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.2),
+                color: AppColors.statusDanger.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.warning_rounded, size: 48, color: Color(0xFFEF4444)),
+              child: const Icon(Icons.warning_rounded, size: 48, color: AppColors.statusDanger),
             ),
             const SizedBox(height: 16),
             const Text(
               "EMERGENCY BEACON ACTIVE",
-              style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFEF4444), fontSize: 18, letterSpacing: 0.5),
+              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.statusDanger, fontSize: 18, letterSpacing: 0.5),
             ),
             const SizedBox(height: 8),
             Text(
@@ -357,8 +398,8 @@ class EmergencyScreen extends StatelessWidget {
                   child: CustomButton(
                     text: "Call Helpline",
                     icon: Icons.phone,
-                    color: const Color(0xFFEF4444),
-                    onPressed: () => controller.makeCall("1122"),
+                    color: AppColors.statusDanger,
+                    onPressed: () => controller.makeCall(primaryHelpline),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -405,21 +446,21 @@ class EmergencyScreen extends StatelessWidget {
               height: 150,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFEF4444),
+                color: AppColors.statusDanger,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFEF4444).withOpacity(0.35),
+                    color: AppColors.statusDanger.withOpacity(0.35),
                     blurRadius: 24,
                     spreadRadius: 8,
                   ),
                   BoxShadow(
-                    color: const Color(0xFFEF4444).withOpacity(0.2),
+                    color: AppColors.statusDanger.withOpacity(0.2),
                     blurRadius: 40,
                     spreadRadius: 16,
                   ),
                 ],
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                  colors: [AppColors.statusDanger, Color(0xFFDC2626)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -456,12 +497,12 @@ class EmergencyScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () => controller.makeCall("1122"),
+                  onTap: () => controller.makeCall(primaryHelpline),
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444),
+                      color: AppColors.statusDanger,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -470,7 +511,7 @@ class EmergencyScreen extends StatelessWidget {
                         Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 18),
                         SizedBox(width: 8),
                         Text(
-                          "Call Ambulance",
+                          "Call Helpline",
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -490,7 +531,7 @@ class EmergencyScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444),
+                      color: AppColors.statusDanger,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -549,7 +590,7 @@ class EmergencyScreen extends StatelessWidget {
             ],
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: Main => mainCenter,
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
