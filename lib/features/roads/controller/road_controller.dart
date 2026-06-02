@@ -7,21 +7,30 @@ import '../model/road_model.dart';
 class RoadController extends ChangeNotifier {
   final List<RoadModel> _roads = [];
   bool _isLoading = false;
+  String? _errorMessage;
   String _searchQuery = "";
-  String _statusFilter = "All"; // 'All', 'Open', 'Caution', 'Blocked'
-  bool _showCommunity = false; // false = only verified roads
+  String _statusFilter = "All";
+  bool _showCommunity = false;
   RealtimeChannel? _roadChannel;
 
-  List<RoadModel> get roads => _roads;
+  // ---------------------------------------------------------------------------
+  // Public getters
+  // ---------------------------------------------------------------------------
+
+  List<RoadModel> get roads => List.unmodifiable(_roads);
   bool get isLoading => _isLoading;
+  bool get hasError => _errorMessage != null;
+  String? get errorMessage => _errorMessage;
   String get searchQuery => _searchQuery;
   String get statusFilter => _statusFilter;
 
   List<RoadModel> get filteredRoads {
     return _roads.where((road) {
-      final matchesSearch = road.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          road.origin.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          road.destination.toLowerCase().contains(_searchQuery.toLowerCase());
+      final query = _searchQuery.toLowerCase();
+      final matchesSearch = query.isEmpty ||
+          road.name.toLowerCase().contains(query) ||
+          road.origin.toLowerCase().contains(query) ||
+          road.destination.toLowerCase().contains(query);
 
       final matchesFilter = _statusFilter == "All" ||
           road.status.toLowerCase() == _statusFilter.toLowerCase();
@@ -32,103 +41,130 @@ class RoadController extends ChangeNotifier {
     }).toList();
   }
 
+  // ---------------------------------------------------------------------------
+  // Constructor — fetch on init
+  // ---------------------------------------------------------------------------
+
   RoadController() {
     loadRoads();
   }
 
-  /// Load road status. Connects to Supabase backend if active, else falls back cleanly to local mock database conditions.
+  // ---------------------------------------------------------------------------
+  // Core data loading
+  // ---------------------------------------------------------------------------
+
+  /// Fetch all roads from Supabase. Starts the realtime subscription on first
+  /// successful load.
   Future<void> loadRoads() async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
-      List<RoadModel> loadedRoads = [];
-
-      // 1. Try to fetch from Supabase if initialized
-      if (SupabaseService.instance.isInitialized) {
-        AppLogger.info("Fetching roads from Supabase backend...");
-        loadedRoads = await SupabaseService.instance.fetchRoads();
-
-        // Check if 'road-other' exists. If not, dynamically insert/upsert it to avoid foreign key violations.
-        final hasOther = loadedRoads.any((r) => r.id == 'road-other');
-        if (!hasOther && SupabaseService.instance.client != null) {
-          try {
-            await SupabaseService.instance.client!.from('roads').upsert({
-              'id': 'road-other',
-              'name': 'Other / Custom Road',
-              'status': 'Open',
-              'description': 'Custom/Other reported valley roads and highways.',
-              'weather': 'Clear',
-              'safety_rating': 5.0,
-              'origin': 'Various',
-              'destination': 'Various',
-              'distance_km': 0,
-              'last_updated': DateTime.now().toUtc().toIso8601String(),
-            });
-            
-            // Add to the fetched list
-            loadedRoads.add(RoadModel(
-              id: 'road-other',
-              name: 'Other / Custom Road',
-              status: 'Open',
-              description: 'Custom/Other reported valley roads and highways.',
-              weather: 'Clear',
-              safetyRating: 5.0,
-              origin: 'Various',
-              destination: 'Various',
-              distanceKm: 0,
-              isVerified: true,
-              createdBy: '',
-              lastUpdated: DateTime.now(),
-            ));
-          } catch (e) {
-            AppLogger.warn("Failed to dynamically upsert 'road-other' to Supabase: $e");
-          }
-        }
-
-        // Establish real-time subscription for subsequent updates (once)
-        if (_roadChannel == null) {
-          _roadChannel = SupabaseService.instance.subscribeToTableChanges(
-            tableName: 'roads',
-            channelId: 'roads-sync',
-            onEvent: (payload) {
-              AppLogger.info("Supabase Realtime Alert: roads updated. Syncing view...");
-              // Hot-reload list from database when changes occur
-              loadRoads();
-            },
-          );
-        }
+      if (!SupabaseService.instance.isInitialized) {
+        _errorMessage = "Service unavailable. Please check your connection.";
+        AppLogger.warn("RoadController: Supabase not initialized.");
+        return;
       }
 
-      // 2. Local Fallback/Mock preset data removed to only show database data as requested.
-      if (loadedRoads.isEmpty) {
-        loadedRoads = [
-          RoadModel(
-              id: 'road-other',
-              name: 'Other / Custom Road',
-              status: 'Open',
-              description: 'Custom/Other reported valley roads and highways.',
-              weather: 'Clear',
-              safetyRating: 5.0,
-              origin: 'Various',
-              destination: 'Various',
-              distanceKm: 0,
-              isVerified: true,
-              createdBy: '',
-              lastUpdated: DateTime.now(),
-            ),
-        ];
-      }
+      AppLogger.info("Fetching roads from Supabase...");
+      final loadedRoads = await SupabaseService.instance.fetchRoads();
 
-      _roads.clear();
-      _roads.addAll(loadedRoads);
+      _roads
+        ..clear()
+        ..addAll(loadedRoads);
+
+      // Subscribe once after first successful load
+      _subscribeToRealtimeUpdates();
+    } on PostgrestException catch (e) {
+      _errorMessage = "Database error: ${e.message}";
+      AppLogger.error("RoadController: PostgrestException during loadRoads", e);
     } catch (e) {
-      AppLogger.error("Failed to load roads status", e);
+      _errorMessage = "Failed to load roads. Pull down to retry.";
+      AppLogger.error("RoadController: Unexpected error during loadRoads", e);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Realtime subscription — granular event handling
+  // ---------------------------------------------------------------------------
+
+  void _subscribeToRealtimeUpdates() {
+    if (_roadChannel != null) return; // Already subscribed
+
+    _roadChannel = SupabaseService.instance.subscribeToTableChanges(
+      tableName: 'roads',
+      channelId: 'roads-realtime-sync',
+      onEvent: _handleRealtimeEvent,
+    );
+  }
+
+  /// Handle individual Postgres change events without re-fetching everything.
+  void _handleRealtimeEvent(PostgresChangePayload payload) {
+    final eventType = payload.eventType;
+    final newRecord = payload.newRecord;
+    final oldRecord = payload.oldRecord;
+
+    AppLogger.info(
+      "Realtime roads event: ${eventType.name} | "
+      "new=${newRecord.isNotEmpty} old=${oldRecord.isNotEmpty}",
+    );
+
+    switch (eventType) {
+      case PostgresChangeEvent.insert:
+        if (newRecord.isNotEmpty) {
+          try {
+            final road = RoadModel.fromJson(newRecord);
+            // Avoid duplicates (e.g. if we just submitted this road ourselves)
+            if (!_roads.any((r) => r.id == road.id)) {
+              _roads.add(road);
+              notifyListeners();
+              AppLogger.success("Realtime INSERT: added '${road.name}'");
+            }
+          } catch (e) {
+            AppLogger.error("Failed to parse realtime INSERT payload", e);
+          }
+        }
+        break;
+
+      case PostgresChangeEvent.update:
+        if (newRecord.isNotEmpty) {
+          try {
+            final updatedRoad = RoadModel.fromJson(newRecord);
+            final idx = _roads.indexWhere((r) => r.id == updatedRoad.id);
+            if (idx != -1) {
+              _roads[idx] = updatedRoad;
+              notifyListeners();
+              AppLogger.success("Realtime UPDATE: patched '${updatedRoad.name}'");
+            }
+          } catch (e) {
+            AppLogger.error("Failed to parse realtime UPDATE payload", e);
+          }
+        }
+        break;
+
+      case PostgresChangeEvent.delete:
+        final deletedId = oldRecord['id']?.toString();
+        if (deletedId != null) {
+          final removed = _roads.removeWhere((r) => r.id == deletedId);
+          notifyListeners();
+          AppLogger.success("Realtime DELETE: removed road '$deletedId'");
+        }
+        break;
+
+      default:
+        // PostgresChangeEvent.all — should not reach here with granular handling
+        AppLogger.info("Realtime: unhandled event type '${eventType.name}', refreshing.");
+        loadRoads();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Filters & search
+  // ---------------------------------------------------------------------------
 
   void updateSearchQuery(String query) {
     _searchQuery = query;
@@ -145,10 +181,14 @@ class RoadController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---------------------------------------------------------------------------
+  // Community road submission
+  // ---------------------------------------------------------------------------
+
   /// Submit a new community road (unverified) on behalf of the current user.
   Future<void> submitRoad(RoadModel road) async {
-    // Ensure required fields are set
-    final userId = SupabaseService.instance.client?.auth.currentUser?.id ?? '';
+    final userId =
+        SupabaseService.instance.client?.auth.currentUser?.id ?? '';
     final roadToSubmit = road.copyWith(
       isVerified: false,
       createdBy: userId,
@@ -159,7 +199,12 @@ class RoadController extends ChangeNotifier {
     await loadRoads();
   }
 
-  /// Update road safety status. Syncs dynamically to backend database, falling back to local memory immediately.
+  // ---------------------------------------------------------------------------
+  // Road status update
+  // ---------------------------------------------------------------------------
+
+  /// Update road safety status. Syncs to backend and applies optimistic local
+  /// update immediately so the UI feels instant.
   Future<void> updateRoadStatus(
     String roadId,
     String newStatus,
@@ -167,22 +212,7 @@ class RoadController extends ChangeNotifier {
     String newWeather,
     double safetyRating,
   ) async {
-    // 1. Sync update to Supabase public.roads table if connected
-    if (SupabaseService.instance.isInitialized) {
-      try {
-        await SupabaseService.instance.updateRoadStatus(
-          roadId: roadId,
-          status: newStatus,
-          description: newDescription,
-          weather: newWeather,
-          safetyRating: safetyRating,
-        );
-      } catch (e) {
-        AppLogger.warn("Supabase road update failed due to connection. Syncing locally first.");
-      }
-    }
-
-    // 2. Perform immediate local memory sync
+    // 1. Optimistic local update
     final index = _roads.indexWhere((road) => road.id == roadId);
     if (index != -1) {
       _roads[index] = _roads[index].copyWith(
@@ -194,12 +224,34 @@ class RoadController extends ChangeNotifier {
       );
       notifyListeners();
     }
+
+    // 2. Sync to Supabase
+    if (SupabaseService.instance.isInitialized) {
+      try {
+        await SupabaseService.instance.updateRoadStatus(
+          roadId: roadId,
+          status: newStatus,
+          description: newDescription,
+          weather: newWeather,
+          safetyRating: safetyRating,
+        );
+      } catch (e) {
+        AppLogger.warn(
+          "Road update failed on backend. Local state may diverge: $e",
+        );
+      }
+    }
   }
+
+  // ---------------------------------------------------------------------------
+  // Disposal
+  // ---------------------------------------------------------------------------
 
   @override
   void dispose() {
     if (_roadChannel != null) {
       SupabaseService.instance.unsubscribeChannel(_roadChannel);
+      _roadChannel = null;
     }
     super.dispose();
   }
