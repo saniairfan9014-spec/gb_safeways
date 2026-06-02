@@ -149,7 +149,7 @@ class RoadController extends ChangeNotifier {
       case PostgresChangeEvent.delete:
         final deletedId = oldRecord['id']?.toString();
         if (deletedId != null) {
-          final removed = _roads.removeWhere((r) => r.id == deletedId);
+          _roads.removeWhere((r) => r.id == deletedId);
           notifyListeners();
           AppLogger.success("Realtime DELETE: removed road '$deletedId'");
         }

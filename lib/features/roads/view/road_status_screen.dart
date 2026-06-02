@@ -22,6 +22,9 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
     super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // Detail bottom sheet
+  // ---------------------------------------------------------------------------
   void _showRoadDetailsSheet(BuildContext context, dynamic road) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final statusColor = AppHelpers.getStatusColor(road.status);
@@ -175,6 +178,10 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Reusable widgets
+  // ---------------------------------------------------------------------------
+
   Widget _buildMetricBox({
     required IconData icon,
     required String label,
@@ -189,8 +196,8 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 10, 
-            color: isLight ? const Color(0xFF94A3B8) : AppColors.textMuted, 
+            fontSize: 10,
+            color: isLight ? const Color(0xFF94A3B8) : AppColors.textMuted,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -214,19 +221,20 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
     Color inactiveFg;
 
     if (label == "All") {
-      activeBg = const Color(0xFF0284C7); // Sky Blue
+      activeBg = const Color(0xFF0284C7);
       inactiveBg = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
       inactiveFg = isLight ? const Color(0xFF475569) : const Color(0xFF94A3B8);
     } else if (label == "Open") {
-      activeBg = const Color(0xFF10B981); // Emerald Green
+      activeBg = const Color(0xFF10B981);
       inactiveBg = isLight ? const Color(0xFFE6F4EA) : const Color(0xFF064E3B).withOpacity(0.3);
       inactiveFg = const Color(0xFF10B981);
     } else if (label == "Blocked") {
-      activeBg = const Color(0xFF334155); // Dark Slate Blue
+      activeBg = const Color(0xFF334155);
       inactiveBg = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
       inactiveFg = isLight ? const Color(0xFF475569) : const Color(0xFF94A3B8);
-    } else { // Closed
-      activeBg = const Color(0xFFEF4444); // Crimson Red
+    } else {
+      // Closed
+      activeBg = const Color(0xFFEF4444);
       inactiveBg = isLight ? const Color(0xFFFCE8E6) : const Color(0xFF7F1D1D).withOpacity(0.3);
       inactiveFg = const Color(0xFFEF4444);
     }
@@ -240,8 +248,8 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
             color: isSelected ? activeBg : inactiveBg,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: isSelected 
-                  ? activeBg 
+              color: isSelected
+                  ? activeBg
                   : (isLight ? const Color(0xFFE2E8F0) : const Color(0xFF334155)),
               width: 1,
             ),
@@ -261,6 +269,151 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Skeleton shimmer loading placeholder
+  // ---------------------------------------------------------------------------
+  Widget _buildSkeletonCard(bool isLight) {
+    final shimmerBase = isLight ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B);
+    final shimmerHighlight = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF334155);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isLight ? Colors.white : AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isLight ? const Color(0xFFE2E8F0) : AppColors.border,
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _shimmerBlock(width: 180, height: 16, base: shimmerBase, highlight: shimmerHighlight),
+              _shimmerBlock(width: 64, height: 24, base: shimmerBase, highlight: shimmerHighlight, radius: 30),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _shimmerBlock(width: 240, height: 12, base: shimmerBase, highlight: shimmerHighlight),
+          const SizedBox(height: 16),
+          _shimmerBlock(width: double.infinity, height: 12, base: shimmerBase, highlight: shimmerHighlight),
+          const SizedBox(height: 6),
+          _shimmerBlock(width: 200, height: 12, base: shimmerBase, highlight: shimmerHighlight),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _shimmerBlock(width: 70, height: 12, base: shimmerBase, highlight: shimmerHighlight),
+              _shimmerBlock(width: 90, height: 12, base: shimmerBase, highlight: shimmerHighlight),
+              _shimmerBlock(width: 50, height: 12, base: shimmerBase, highlight: shimmerHighlight),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shimmerBlock({
+    required double height,
+    required Color base,
+    required Color highlight,
+    double? width,
+    double radius = 8,
+  }) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.3, end: 1.0),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeInOut,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              gradient: LinearGradient(
+                colors: [base, highlight, base],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        // Trigger rebuild to loop animation
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Error state widget
+  // ---------------------------------------------------------------------------
+  Widget _buildErrorState(BuildContext context, RoadController controller, bool isLight) {
+    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
+    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
+    final borderCol = isLight ? const Color(0xFFE2E8F0) : AppColors.border;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.statusDanger.withOpacity(0.08),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.statusDanger.withOpacity(0.2), width: 1.5),
+              ),
+              child: Icon(
+                Icons.cloud_off_rounded,
+                size: 48,
+                color: AppColors.statusDanger.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "Connection Lost",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textPrim,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              controller.errorMessage ?? "Something went wrong.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: textSec, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () => controller.loadRoads(),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text("Try Again"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF0284C7),
+                side: BorderSide(color: borderCol),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final roadController = context.watch<RoadController>();
@@ -280,22 +433,65 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header title
-              Text(
-                "Road Status",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: textPrim,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "Live mountain highway logs and checkpoints",
-                style: TextStyle(
-                  fontSize: 13,
-                  color: textSec,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Road Status",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: textPrim,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Live mountain highway logs and checkpoints",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: textSec,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Live indicator dot
+                  if (!roadController.isLoading && !roadController.hasError)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.statusOpen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.statusOpen.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: AppColors.statusOpen,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            "LIVE",
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.statusOpen,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -358,47 +554,66 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Roads List
+              // Roads List — Loading / Error / Empty / Data states
               Expanded(
-                child: roadController.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : RefreshIndicator(
-                        onRefresh: () => roadController.loadRoads(),
-                        child: roadController.filteredRoads.isEmpty
-                            ? ListView(
-                                children: [
-                                  SizedBox(
-                                    height: MediaQuery.of(context).size.height * 0.5,
-                                    child: EmptyState(
-                                      title: "No Routes Found",
-                                      description: "Try adjusting your search criteria or filters.",
-                                      icon: Icons.directions_off_rounded,
-                                      onAction: () {
-                                        _searchController.clear();
-                                        roadController.updateSearchQuery("");
-                                        roadController.setFilter("All");
-                                      },
-                                      actionText: "Reset Filters",
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : ListView.builder(
-                                itemCount: roadController.filteredRoads.length,
-                                itemBuilder: (context, index) {
-                                  final road = roadController.filteredRoads[index];
-                                  return RoadCard(
-                                    road: road,
-                                    onTap: () => _showRoadDetailsSheet(context, road),
-                                  );
-                                },
-                              ),
-                      ),
+                child: _buildBody(context, roadController, isLight),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// Routes to the appropriate state widget.
+  Widget _buildBody(BuildContext context, RoadController controller, bool isLight) {
+    // ── Loading state ──
+    if (controller.isLoading) {
+      return ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 4,
+        itemBuilder: (_, __) => _buildSkeletonCard(isLight),
+      );
+    }
+
+    // ── Error state ──
+    if (controller.hasError) {
+      return _buildErrorState(context, controller, isLight);
+    }
+
+    // ── Data / Empty state ──
+    return RefreshIndicator(
+      onRefresh: () => controller.loadRoads(),
+      color: const Color(0xFF0284C7),
+      child: controller.filteredRoads.isEmpty
+          ? ListView(
+              children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.5,
+                  child: EmptyState(
+                    title: "No Routes Found",
+                    description: "Try adjusting your search criteria or filters.",
+                    icon: Icons.directions_off_rounded,
+                    onAction: () {
+                      _searchController.clear();
+                      controller.updateSearchQuery("");
+                      controller.setFilter("All");
+                    },
+                    actionText: "Reset Filters",
+                  ),
+                ),
+              ],
+            )
+          : ListView.builder(
+              itemCount: controller.filteredRoads.length,
+              itemBuilder: (context, index) {
+                final road = controller.filteredRoads[index];
+                return RoadCard(
+                  road: road,
+                  onTap: () => _showRoadDetailsSheet(context, road),
+                );
+              },
+            ),
     );
   }
 }
