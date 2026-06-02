@@ -14,8 +14,8 @@ class AppHelpers {
       case 'one-way':
       case 'partial':
       case 'under construction':
+      case 'closed': // Mapped to Orange per user request
         return AppColors.statusCaution;
-      case 'closed':
       case 'blocked':
       case 'danger':
       case 'hazard':
@@ -34,8 +34,8 @@ class AppHelpers {
       case 'one-way':
       case 'partial':
       case 'under construction':
+      case 'closed': // Mapped to warning icon to match statusCaution color
         return Icons.warning_amber_rounded;
-      case 'closed':
       case 'blocked':
       case 'danger':
       case 'hazard':
