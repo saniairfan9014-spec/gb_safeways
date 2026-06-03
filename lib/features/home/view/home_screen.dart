@@ -11,6 +11,7 @@ import '../../../routes/route_names.dart';
 import '../../roads/view/road_status_screen.dart';
 import '../../reports/view/report_screen.dart';
 import '../../emergency/view/emergency_screen.dart';
+import '../../emergency/widget/floating_sos_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,7 +53,12 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(gradient: AppColors.darkGradient),
               child: const Center(child: CircularProgressIndicator()),
             )
-          : _tabs[_currentTab],
+          : Stack(
+              children: [
+                _tabs[_currentTab],
+                const FloatingSosButton(),
+              ],
+            ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTab,
         onTap: (index) {

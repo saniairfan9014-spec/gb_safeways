@@ -7,6 +7,9 @@ import '../features/roads/view/road_status_screen.dart';
 import '../features/reports/view/report_screen.dart';
 import '../features/reports/view/alerts_screen.dart';
 import '../features/emergency/view/emergency_screen.dart';
+import '../features/emergency/view/emergency_details_screen.dart';
+import '../features/emergency/view/sos_history_screen.dart';
+import '../features/emergency/view/admin_sos_dashboard.dart';
 import 'route_names.dart';
 
 class AppRoutes {
@@ -43,6 +46,15 @@ class AppRoutes {
 
       case RouteNames.profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+
+      case RouteNames.sosDetails:
+        return MaterialPageRoute(builder: (_) => const EmergencyDetailsScreen());
+
+      case RouteNames.sosHistory:
+        return MaterialPageRoute(builder: (_) => const SosHistoryScreen());
+
+      case RouteNames.sosAdmin:
+        return MaterialPageRoute(builder: (_) => const AdminSosDashboard());
 
       default:
         return MaterialPageRoute(

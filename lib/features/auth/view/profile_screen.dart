@@ -712,6 +712,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     Divider(color: borderCol, height: 1, thickness: 1),
 
+                    // My SOS History Row
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.history_toggle_off_rounded, color: Color(0xFFEF4444), size: 18),
+                      ),
+                      title: Text(
+                        "My SOS History",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
+                      ),
+                      subtitle: const Text(
+                        "View your historical satellite distress beacons",
+                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
+                      onTap: () {
+                        Navigator.pushNamed(context, RouteNames.sosHistory);
+                      },
+                    ),
+                    Divider(color: borderCol, height: 1, thickness: 1),
+
                     // Admin Verification Portal Row
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -739,6 +765,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             builder: (_) => const AdminReportsScreen(),
                           ),
                         );
+                      },
+                    ),
+                    Divider(color: borderCol, height: 1, thickness: 1),
+
+                    // Admin SOS Dashboard Row
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.admin_panel_settings_outlined, color: Color(0xFFEF4444), size: 18),
+                      ),
+                      title: Text(
+                        "Admin SOS Dashboard",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
+                      ),
+                      subtitle: const Text(
+                        "Monitor real-time active valley SOS alerts",
+                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
+                      onTap: () {
+                        Navigator.pushNamed(context, RouteNames.sosAdmin);
                       },
                     ),
                   ],

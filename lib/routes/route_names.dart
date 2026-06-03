@@ -10,4 +10,7 @@ class RouteNames {
   static const String emergency = '/emergency';
   static const String alerts = '/alerts';
   static const String profile = '/profile';
+  static const String sosDetails = '/sos-details';
+  static const String sosHistory = '/sos-history';
+  static const String sosAdmin = '/sos-admin';
 }
