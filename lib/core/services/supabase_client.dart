@@ -321,22 +321,28 @@ class SupabaseService {
   Future<ReportModel?> submitReport(ReportModel report) async {
     return _executeWithRetry<ReportModel?>(
       () async {
-        final Map<String, dynamic> rawJson = report.toJson();
-        
-        // Remove client‑side mock ID if it doesn't match standard UUID format
-        if (!_isValidUuid(rawJson['id']?.toString())) {
-          rawJson.remove('id');
-        }
+        final Map<String, dynamic> dbPayload = {
+          'message': '[Hazard: ${report.hazardType}] [Severity: ${report.severity}] ${report.description}',
+          'image': report.imageUrl ?? '',
+          'location': '${report.latitude.toStringAsFixed(4)}, ${report.longitude.toStringAsFixed(4)}',
+          'status': report.status,
+          'created_at': report.createdAt.toUtc().toIso8601String(),
+        };
 
-        // Sanitize user_id to ensure it's a valid UUID to avoid PostgREST cast exception
-        final userId = rawJson['user_id']?.toString();
-        if (!_isValidUuid(userId)) {
-          rawJson['user_id'] = null;
+        // Standardize foreign key mapping: Ensure user_id is a valid UUID or null
+        dbPayload['user_id'] = _isValidUuid(report.userId) ? report.userId : null;
+
+        // Standardize foreign key mapping: Ensure road_id is a valid UUID or null
+        dbPayload['road_id'] = _isValidUuid(report.roadId) ? report.roadId : null;
+
+        // If the report id is a valid UUID, use it. Otherwise, let database generate it.
+        if (_isValidUuid(report.id)) {
+          dbPayload['id'] = report.id;
         }
 
         final List<dynamic> response = await client!
             .from('reports')
-            .insert(rawJson)
+            .insert(dbPayload)
             .select();
 
         if (response.isNotEmpty) {
@@ -364,9 +370,14 @@ class SupabaseService {
     await _executeWithRetry<void>(
       () async {
         // Execute atomic RPC call on database to prevent lost upvotes race conditions
-        await client!.rpc('increment_report_upvotes', params: {
-          'report_id': reportId,
-        });
+        // Bypassed if 'upvotes' column doesn't exist on reports table
+        try {
+          await client!.rpc('increment_report_upvotes', params: {
+            'report_id': reportId,
+          });
+        } catch (e) {
+          AppLogger.warn("Database RPC for upvotes failed (column/function might be missing).");
+        }
       },
       operationName: "upvoteReport",
       timeout: _defaultTimeout,
@@ -383,8 +394,7 @@ class SupabaseService {
     await _executeWithRetry<void>(
       () async {
         await client!.from('reports').update({
-          'is_resolved': true,
-          'status': 'verified', // Support both boolean and enum schema fields for maximum resilience
+          'status': 'verified',
         }).eq('id', reportId);
       },
       operationName: "resolveReport",
@@ -406,7 +416,6 @@ class SupabaseService {
       () async {
         await client!.from('reports').update({
           'status': status,
-          'is_resolved': status == 'verified' || status == 'rejected',
         }).eq('id', reportId);
         AppLogger.success("Supabase updated report status: $reportId -> $status");
       },

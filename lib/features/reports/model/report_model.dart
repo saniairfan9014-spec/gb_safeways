@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ReportModel {
   final String id;
   final String userId;
@@ -103,6 +105,50 @@ class ReportModel {
     final parsedStatus = json['status'] as String? ?? 'pending';
     final parsedIsResolved = json['is_resolved'] as bool? ?? (parsedStatus == 'verified' || parsedStatus == 'rejected');
 
+    String rawMessage = json['message'] as String? ?? json['description'] as String? ?? '';
+    String hazardType = json['hazard_type'] as String? ?? 'Hazard';
+    String severity = json['severity'] as String? ?? 'Medium';
+    String description = rawMessage;
+
+    // Try to parse hazardType and severity from the message prefix
+    // Prefix format: [Hazard: Landslide] [Severity: High] Description details...
+    final prefixRegex = RegExp(r'^\[Hazard:\s*(.+?)\]\s*\[Severity:\s*(.+?)\]\s*(.*)$');
+    final match = prefixRegex.firstMatch(rawMessage);
+    if (match != null) {
+      hazardType = match.group(1) ?? hazardType;
+      severity = match.group(2) ?? severity;
+      description = match.group(3) ?? description;
+    } else if (rawMessage.startsWith('{') && rawMessage.endsWith('}')) {
+      // JSON fallback
+      try {
+        final Map<String, dynamic> parsedMsg = jsonDecode(rawMessage);
+        description = parsedMsg['description'] as String? ?? description;
+        hazardType = parsedMsg['hazard_type'] as String? ?? hazardType;
+        severity = parsedMsg['severity'] as String? ?? severity;
+      } catch (_) {}
+    }
+
+    double latitude = 35.9208;
+    double longitude = 74.3089;
+
+    // Check latitude and longitude from json directly
+    if (json['latitude'] != null) {
+      latitude = (json['latitude'] as num).toDouble();
+    }
+    if (json['longitude'] != null) {
+      longitude = (json['longitude'] as num).toDouble();
+    }
+
+    // Parse from location column if coordinates are defaults and location column is present
+    final locStr = json['location'] as String?;
+    if (locStr != null && locStr.contains(',')) {
+      final parts = locStr.split(',');
+      if (parts.length == 2) {
+        latitude = double.tryParse(parts[0].trim()) ?? latitude;
+        longitude = double.tryParse(parts[1].trim()) ?? longitude;
+      }
+    }
+
     return ReportModel(
       id: json['id'] as String,
       userId: json['user_id'] as String? ?? '',
@@ -110,11 +156,11 @@ class ReportModel {
       userAvatar: json['user_avatar'] as String? ?? userData?['avatar'] as String? ?? 'https://ui-avatars.com/api/?name=Traveler&background=0284C7&color=fff&bold=true',
       roadId: json['road_id'] as String? ?? '',
       roadName: json['road_name'] as String? ?? roadData?['name'] as String? ?? 'Road',
-      hazardType: json['hazard_type'] as String? ?? 'Hazard',
-      description: json['message'] as String? ?? json['description'] as String? ?? '',
-      severity: json['severity'] as String? ?? 'Medium',
-      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : 35.9208,
-      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : 74.3089,
+      hazardType: hazardType,
+      description: description,
+      severity: severity,
+      latitude: latitude,
+      longitude: longitude,
       upvotes: json['upvotes'] as int? ?? 0,
       isResolved: parsedIsResolved,
       status: parsedStatus,
