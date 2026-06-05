@@ -10,6 +10,9 @@ import '../features/emergency/view/emergency_screen.dart';
 import '../features/emergency/view/emergency_details_screen.dart';
 import '../features/emergency/view/sos_history_screen.dart';
 import '../features/emergency/view/admin_sos_dashboard.dart';
+import '../features/settings/view/settings_screen.dart';
+import '../features/settings/view/emergency_contacts_screen.dart';
+import '../features/settings/view/help_support_screen.dart';
 import 'route_names.dart';
 
 class AppRoutes {
@@ -20,7 +23,7 @@ class AppRoutes {
       case RouteNames.initial:
         // By default, home screen will handle checking auth session,
         // returning login if not authenticated, or the dashboard.
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
       
       case RouteNames.login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
@@ -55,6 +58,15 @@ class AppRoutes {
 
       case RouteNames.sosAdmin:
         return MaterialPageRoute(builder: (_) => const AdminSosDashboard());
+
+      case RouteNames.settings:
+        return MaterialPageRoute(builder: (_) => const SettingsScreen());
+
+      case RouteNames.emergencyContacts:
+        return MaterialPageRoute(builder: (_) => const EmergencyContactsScreen());
+
+      case RouteNames.helpSupport:
+        return MaterialPageRoute(builder: (_) => const HelpSupportScreen());
 
       default:
         return MaterialPageRoute(

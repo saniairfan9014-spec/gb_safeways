@@ -5,38 +5,40 @@ import '../../core/constants/app_colors.dart';
 class AppHelpers {
   AppHelpers._();
 
-  static Color getStatusColor(String status) {
+  static Color getStatusColor(String? status) {
+    if (status == null || status.trim().isEmpty) return Colors.grey;
     switch (status.toLowerCase()) {
       case 'open':
       case 'safe':
-        return AppColors.statusOpen;
+        return AppColors.statusOpen; // Green
+      case 'blocked':
       case 'caution':
       case 'one-way':
       case 'partial':
       case 'under construction':
-        return AppColors.statusCaution;
+        return Colors.orange; // Orange for Blocked
       case 'closed':
-      case 'blocked':
       case 'danger':
       case 'hazard':
-        return AppColors.statusDanger;
+        return AppColors.statusDanger; // Red
       default:
-        return AppColors.statusUnknown;
+        return Colors.grey; // Not confirmed / Unknown
     }
   }
 
-  static IconData getStatusIcon(String status) {
+  static IconData getStatusIcon(String? status) {
+    if (status == null || status.trim().isEmpty) return Icons.help_outline;
     switch (status.toLowerCase()) {
       case 'open':
       case 'safe':
         return Icons.check_circle_outline;
+      case 'blocked':
       case 'caution':
       case 'one-way':
       case 'partial':
       case 'under construction':
         return Icons.warning_amber_rounded;
       case 'closed':
-      case 'blocked':
       case 'danger':
       case 'hazard':
         return Icons.block_flipped;

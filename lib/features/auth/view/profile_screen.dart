@@ -442,20 +442,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    
-                    // Phone Info Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.phone_iphone_rounded, size: 16, color: Color(0xFF0284C7)),
-                        const SizedBox(width: 8),
-                        Text(
-                          user.phoneNumber,
-                          style: TextStyle(fontSize: 13, color: textSec, fontWeight: FontWeight.w500),
+                    // Phone Info Row — only show if user has a real phone number
+                    if (user.phoneNumber.isNotEmpty &&
+                        user.phoneNumber != '+92 355 4567890')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.phone_iphone_rounded, size: 16, color: Color(0xFF0284C7)),
+                            const SizedBox(width: 8),
+                            Text(
+                              user.phoneNumber,
+                              style: TextStyle(fontSize: 13, color: textSec, fontWeight: FontWeight.w500),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ),

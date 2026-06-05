@@ -81,7 +81,7 @@ class RoadModel {
     return RoadModel(
       id: json['id'] as String,
       name: json['name'] as String,
-      status: json['status'] as String? ?? 'open',
+      status: json['status'] as String? ?? '',
       description: json['description'] as String? ?? '',
       weather: json['weather'] as String? ?? 'Clear',
       safetyRating: json['safety_rating'] != null ? (json['safety_rating'] as num).toDouble() : 4.5,

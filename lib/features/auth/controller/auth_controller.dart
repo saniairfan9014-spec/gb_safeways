@@ -180,6 +180,53 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateProfile({required String fullName, required String email, required String phoneNumber}) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      if (fullName.isEmpty || email.isEmpty || phoneNumber.isEmpty) {
+        throw Exception("Please fill in all fields.");
+      }
+
+      if (SupabaseService.instance.isInitialized && _currentUser != null) {
+        AppLogger.info("Updating profile on Supabase...");
+        await SupabaseService.instance.client!
+            .from('users')
+            .update({
+              'full_name': fullName,
+              'email': email,
+              'phone_number': phoneNumber,
+            })
+            .eq('id', _currentUser!.id);
+      }
+
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(
+          fullName: fullName,
+          email: email,
+          phoneNumber: phoneNumber,
+          avatarUrl: AppHelpers.getRandomAvatarUrl(fullName),
+        );
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_email', email);
+      await prefs.setString('user_name', fullName);
+      await prefs.setString('user_phone', phoneNumber);
+
+      NotificationService.instance.showSuccessSnackbar("Profile updated successfully!");
+      return true;
+    } catch (e) {
+      AppLogger.error("Failed to update profile", e);
+      NotificationService.instance.showErrorSnackbar(e.toString().replaceAll("Exception: ", ""));
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     if (SupabaseService.instance.isInitialized) {
       await SupabaseService.instance.logout();

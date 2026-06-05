@@ -7,18 +7,6 @@ class UserModel {
   final int contributionsCount;
   final String badge;
   final DateTime createdAt;
-
-  UserModel({
-    required this.id,
-    required this.email,
-    required this.fullName,
-    required this.avatarUrl,
-    this.phoneNumber = "+92 355 4567890",
-    this.contributionsCount = 0,
-    this.badge = "Basecamp Guide",
-    required this.createdAt,
-  });
-
   UserModel copyWith({
     String? id,
     String? email,
@@ -41,27 +29,39 @@ class UserModel {
     );
   }
 
+  UserModel({
+    required this.id,
+    required this.email,
+    required this.fullName,
+    required this.avatarUrl,
+    required this.phoneNumber,
+    required this.createdAt,
+    this.contributionsCount = 0,
+    this.badge = "Basecamp Guide",
+  });
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'].toString(),
+      email: json['email'] ?? '',
+      fullName: json['name'] ?? '',
+      avatarUrl: json['avatar'] ?? '',
+      phoneNumber: json['phone'] ?? '',
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'email': email,
       'name': fullName,
       'phone': phoneNumber,
       'avatar': avatarUrl,
       'role': 'user',
       'created_at': createdAt.toIso8601String(),
     };
-  }
-
-  factory UserModel.fromJson(Map<String, dynamic> json) {
-    return UserModel(
-      id: json['id'] as String,
-      email: json['email'] as String? ?? 'traveler@karakoram.com',
-      fullName: json['name'] as String? ?? json['full_name'] as String? ?? 'Karakoram Adventurer',
-      avatarUrl: json['avatar'] as String? ?? json['avatar_url'] as String? ?? 'https://ui-avatars.com/api/?name=Traveler&background=0284C7&color=fff&bold=true',
-      phoneNumber: json['phone'] as String? ?? json['phone_number'] as String? ?? '+92 355 4567890',
-      contributionsCount: json['contributions_count'] as int? ?? 0,
-      badge: json['badge'] as String? ?? "Basecamp Guide",
-      createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
-    );
   }
 }

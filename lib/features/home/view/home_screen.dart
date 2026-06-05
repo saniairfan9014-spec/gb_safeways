@@ -200,7 +200,7 @@ class _DashboardViewState extends State<DashboardView> {
                     // User Avatar with contribution badge tooltip
                     GestureDetector(
                       onTap: () {
-                        Navigator.pushNamed(context, RouteNames.profile);
+                        Navigator.pushNamed(context, RouteNames.settings);
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -477,6 +477,26 @@ class _DashboardViewState extends State<DashboardView> {
                                           height: 1.4,
                                         ),
                                       ),
+                                      const SizedBox(height: 12),
+                                      
+                                      // Reporter Info
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 10,
+                                            backgroundImage: NetworkImage(report.userAvatar.isNotEmpty ? report.userAvatar : AppHelpers.getRandomAvatarUrl(report.userName)),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            "Reported by ${report.userName}",
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                       const SizedBox(height: 14),
 
                                       // Action panel (Upvote Confirmations & Severity status badge)
@@ -511,17 +531,21 @@ class _DashboardViewState extends State<DashboardView> {
                                           ),
                                           ElevatedButton.icon(
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFF1F5F9),
-                                              foregroundColor: const Color(0xFF334155),
+                                              backgroundColor: reportController.hasConfirmed(report.id) ? const Color(0xFFE2E8F0) : const Color(0xFFF1F5F9),
+                                              foregroundColor: reportController.hasConfirmed(report.id) ? const Color(0xFF94A3B8) : const Color(0xFF334155),
                                               elevation: 0,
                                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                               minimumSize: Size.zero,
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             ),
-                                            onPressed: () => reportController.upvoteReport(report.id),
-                                            icon: const Icon(Icons.thumb_up_rounded, size: 12, color: Color(0xFF0284C7)),
+                                            onPressed: reportController.hasConfirmed(report.id) ? null : () => reportController.upvoteReport(report.id),
+                                            icon: Icon(
+                                              reportController.hasConfirmed(report.id) ? Icons.check_circle_rounded : Icons.thumb_up_rounded,
+                                              size: 12,
+                                              color: reportController.hasConfirmed(report.id) ? const Color(0xFF94A3B8) : const Color(0xFF0284C7),
+                                            ),
                                             label: Text(
-                                              "Confirm (${report.upvotes})",
+                                              reportController.hasConfirmed(report.id) ? "Confirmed" : "Confirm (${report.upvotes})",
                                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                             ),
                                           ),

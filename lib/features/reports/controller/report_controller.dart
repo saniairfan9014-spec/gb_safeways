@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/notification_service.dart';
@@ -16,14 +17,41 @@ class ReportController extends ChangeNotifier {
   RealtimeChannel? _reportChannel;
   RealtimeChannel? _alertChannel;
 
+  /// Tracks report IDs this user has already confirmed. Persisted locally.
+  final Set<String> _confirmedReportIds = {};
+
   List<ReportModel> get reports => _reports;
   List<AlertModel> get alerts => _alerts;
   bool get isLoading => _isLoading;
 
   List<ReportModel> get activeReports => _reports.where((r) => !r.isResolved).toList();
 
+  /// Returns true if the current user has already confirmed this report.
+  bool hasConfirmed(String reportId) => _confirmedReportIds.contains(reportId);
+
   ReportController() {
+    _loadConfirmedIds();
     loadReports();
+  }
+
+  Future<void> _loadConfirmedIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList('confirmed_report_ids') ?? [];
+      _confirmedReportIds.addAll(saved);
+      notifyListeners();
+    } catch (e) {
+      AppLogger.warn("Failed to load confirmed report IDs: $e");
+    }
+  }
+
+  Future<void> _saveConfirmedIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('confirmed_report_ids', _confirmedReportIds.toList());
+    } catch (e) {
+      AppLogger.warn("Failed to save confirmed report IDs: $e");
+    }
   }
 
   /// Load safety alerts and user reports. Syncs with Supabase if active, else uses presets.
@@ -174,25 +202,34 @@ class ReportController extends ChangeNotifier {
     }
   }
 
-  /// Upvotes an active report to increase its credibility
+  /// Confirms an active report once per user — prevents duplicate confirmations.
   Future<void> upvoteReport(String reportId) async {
+    // Guard: already confirmed by this user
+    if (_confirmedReportIds.contains(reportId)) {
+      NotificationService.instance.showSuccessSnackbar("You have already confirmed this report.");
+      return;
+    }
+
     final index = _reports.indexWhere((r) => r.id == reportId);
     if (index != -1) {
       final report = _reports[index];
 
-      // 1. Sync to Supabase if active
+      // 1. Mark as confirmed locally first (optimistic)
+      _confirmedReportIds.add(reportId);
+      _reports[index] = report.copyWith(upvotes: report.upvotes + 1);
+      notifyListeners();
+      await _saveConfirmedIds();
+
+      // 2. Sync to Supabase
       if (SupabaseService.instance.isInitialized) {
         try {
           await SupabaseService.instance.upvoteReport(reportId, report.upvotes);
         } catch (e) {
-          AppLogger.warn("Upvote sync to Supabase failed.");
+          AppLogger.warn("Upvote sync to Supabase failed — local count updated.");
         }
       }
 
-      // 2. Update locally
-      _reports[index] = report.copyWith(upvotes: report.upvotes + 1);
-      notifyListeners();
-      NotificationService.instance.showSuccessSnackbar("Upvoted report. Thanks for validating road safety!");
+      NotificationService.instance.showSuccessSnackbar("Report confirmed! Thanks for keeping GB roads safe. 🏔️");
     }
   }
 

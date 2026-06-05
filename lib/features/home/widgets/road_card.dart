@@ -81,7 +81,7 @@ class RoadCard extends StatelessWidget {
                           Icon(statusIcon, size: 14, color: statusColor),
                           const SizedBox(width: 4),
                           Text(
-                            road.status.toUpperCase(),
+                            (road.status.trim().isEmpty) ? 'NOT CONFIRMED' : road.status.toUpperCase(),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,

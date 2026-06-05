@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../controller/road_controller.dart';
+import '../model/road_model.dart';
 import '../../home/widgets/road_card.dart';
 
 class RoadStatusScreen extends StatefulWidget {
@@ -91,7 +92,7 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
                           Icon(statusIcon, size: 14, color: statusColor),
                           const SizedBox(width: 4),
                           Text(
-                            road.status.toUpperCase(),
+                            (road.status.trim().isEmpty) ? 'NOT CONFIRMED' : road.status.toUpperCase(),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -424,9 +425,18 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
     final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
     final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
 
-    return Container(
-      color: bgCol,
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: bgCol,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddRoadSheet(context),
+        backgroundColor: const Color(0xFF0284C7),
+        icon: const Icon(Icons.add_road_rounded, color: Colors.white),
+        label: const Text(
+          "Add Road",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
           child: Column(
@@ -614,6 +624,139 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
                 );
               },
             ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Add Road bottom sheet
+  // ---------------------------------------------------------------------------
+  void _showAddRoadSheet(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final sheetBg = isLight ? Colors.white : AppColors.surface;
+    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
+    
+    final nameController = TextEditingController();
+    final originController = TextEditingController();
+    final destController = TextEditingController();
+    final descController = TextEditingController();
+    String selectedStatus = 'open';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: sheetBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Add New Road",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: textPrim,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: "Road Name (e.g. KKH, N-15)"),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: originController,
+                            decoration: const InputDecoration(labelText: "From (Origin)"),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: destController,
+                            decoration: const InputDecoration(labelText: "To (Destination)"),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedStatus,
+                      decoration: const InputDecoration(labelText: "Current Status"),
+                      items: const [
+                        DropdownMenuItem(value: 'open', child: Text("Open")),
+                        DropdownMenuItem(value: 'closed', child: Text("Closed")),
+                        DropdownMenuItem(value: 'blocked', child: Text("Blocked")),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => selectedStatus = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: "Latest Advisory / Description"),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          if (nameController.text.trim().isEmpty) return;
+                          
+                          final newRoad = RoadModel(
+                            id: 'road-${DateTime.now().millisecondsSinceEpoch}',
+                            name: nameController.text.trim(),
+                            status: selectedStatus,
+                            description: descController.text.trim().isNotEmpty ? descController.text.trim() : "No advisory available.",
+                            weather: "Clear",
+                            safetyRating: 4.5,
+                            origin: originController.text.trim().isNotEmpty ? originController.text.trim() : "Unknown",
+                            destination: destController.text.trim().isNotEmpty ? destController.text.trim() : "Unknown",
+                            distanceKm: 0,
+                            isVerified: false,
+                            createdBy: '',
+                            lastUpdated: DateTime.now(),
+                          );
+                          
+                          context.read<RoadController>().submitRoad(newRoad);
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text("Submit Road", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
