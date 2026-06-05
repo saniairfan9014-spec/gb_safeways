@@ -293,23 +293,28 @@ class SupabaseService {
   // HAZARD REPORTS APIS
   // =====================================================================
 
-  /// Fetch all active hazard reports
+  /// Fetch all hazard reports (latest first)
   Future<List<ReportModel>> fetchReports() async {
     return _executeWithRetry<List<ReportModel>>(
       () async {
-        // Resolve database schema mismatch using PostgREST column aliasing:
-        // maps 'full_name' to 'name', and 'avatar_url' to 'avatar' to seamlessly 
-        // align with what ReportModel.fromJson expects without breaking client code.
-        final List<dynamic> data = await client!
-            .from('reports')
-            .select('*, users(name:full_name, avatar:avatar_url), roads(name)')
-            .order('created_at', ascending: false);
+        List<dynamic> data;
 
-        // Filter out resolved/verified reports in Dart memory to be fully compatible with differing schemas
-        return data
-            .map((json) => ReportModel.fromJson(json))
-            .where((report) => !report.isResolved)
-            .toList();
+        // Try fetching with user/road joins first for enriched data display.
+        // Fall back to simple select if the joins fail (schema may not have
+        // the expected foreign-key relationships exposed via PostgREST).
+        try {
+          data = await client!
+              .from('reports')
+              .select('*, users(name:full_name, avatar:avatar_url), roads(name)')
+              .order('created_at', ascending: false);
+        } catch (_) {
+          data = await client!
+              .from('reports')
+              .select()
+              .order('created_at', ascending: false);
+        }
+
+        return data.map((json) => ReportModel.fromJson(json)).toList();
       },
       operationName: "fetchReports",
       timeout: _defaultTimeout,

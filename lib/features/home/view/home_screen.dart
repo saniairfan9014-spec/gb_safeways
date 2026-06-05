@@ -118,14 +118,15 @@ class _DashboardViewState extends State<DashboardView> {
 
     if (user == null) return const SizedBox.shrink();
 
-    // Filter reports/updates if search query is present
+    // Show all reports (latest first), filtered by search query if present
     final searchQuery = _searchController.text.trim().toLowerCase();
-    final updates = reportController.activeReports.where((report) {
+    final updates = reportController.reports.where((report) {
       if (searchQuery.isEmpty) return true;
       return report.roadName.toLowerCase().contains(searchQuery) ||
           report.hazardType.toLowerCase().contains(searchQuery) ||
           report.description.toLowerCase().contains(searchQuery);
-    }).toList();
+    }).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // soft white background
