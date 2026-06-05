@@ -76,8 +76,7 @@ class ReportModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final map = {
       'user_id': userId,
       'user_name': userName,
       'user_avatar': userAvatar,
@@ -96,6 +95,14 @@ class ReportModel {
       'status': status,
       'created_at': createdAt.toIso8601String(),
     };
+    
+    // Only include ID if it is a valid UUID from Supabase. 
+    // Locally generated IDs starting with 'report-' should be omitted so DB auto-generates.
+    if (!id.startsWith('report-')) {
+      map['id'] = id;
+    }
+    
+    return map;
   }
 
   factory ReportModel.fromJson(Map<String, dynamic> json) {

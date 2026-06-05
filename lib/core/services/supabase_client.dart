@@ -157,7 +157,7 @@ class SupabaseService {
   Future<List<ReportModel>> fetchReports() async {
     return _executeWithRetry<List<ReportModel>>(
           () async {
-        final data = await client!.from('reports').select();
+        final data = await client!.from('reports').select('*, users(name, avatar), roads(name)').order('created_at', ascending: false);
         return (data as List)
             .map((e) => ReportModel.fromJson(e))
             .toList();
@@ -336,6 +336,18 @@ class SupabaseService {
             .from('alerts')
             .select()
             .order('created_at', ascending: false);
+
+        if (data.isEmpty) {
+          return [
+            AlertModel(
+              id: 'alert-mock-1',
+              title: "Welcome to GB SafeWay",
+              message: "Drive safely and obey speed limits across Karakoram Highway and inter-city passes.",
+              severity: "Info",
+              createdAt: DateTime.now(),
+            )
+          ];
+        }
 
         return data
             .map((json) => AlertModel.fromJson(Map<String, dynamic>.from(json)))

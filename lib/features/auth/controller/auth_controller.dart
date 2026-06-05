@@ -78,23 +78,27 @@ class AuthController extends ChangeNotifier {
         userProfile = await SupabaseService.instance.login(email: email, password: password);
       }
 
-      // 2. Local Fallback simulation if Supabase is disabled or offline
+      // 2. Local Fallback simulation only if Supabase is offline/inactive
       if (userProfile == null) {
-        AppLogger.warn("Supabase auth offline/inactive. Simulating fallback session.");
-        await Future.delayed(const Duration(milliseconds: 1000));
-        
-        final name = email.split('@')[0].toUpperCase();
-        const phone = '+92 355 4567890';
-        userProfile = UserModel(
-          id: 'mock-uuid-1234',
-          email: email,
-          fullName: name,
-          avatarUrl: AppHelpers.getRandomAvatarUrl(name),
-          phoneNumber: phone,
-          contributionsCount: 4,
-          badge: _calculateBadge(4),
-          createdAt: DateTime.now().subtract(const Duration(days: 30)),
-        );
+        if (!SupabaseService.instance.isInitialized) {
+          AppLogger.warn("Supabase auth offline/inactive. Simulating fallback session.");
+          await Future.delayed(const Duration(milliseconds: 1000));
+          
+          final name = email.split('@')[0].toUpperCase();
+          const phone = '+92 355 4567890';
+          userProfile = UserModel(
+            id: 'mock-uuid-1234',
+            email: email,
+            fullName: name,
+            avatarUrl: AppHelpers.getRandomAvatarUrl(name),
+            phoneNumber: phone,
+            contributionsCount: 4,
+            badge: _calculateBadge(4),
+            createdAt: DateTime.now().subtract(const Duration(days: 30)),
+          );
+        } else {
+          throw Exception("Invalid email or password");
+        }
       }
 
       _currentUser = userProfile;

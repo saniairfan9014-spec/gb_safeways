@@ -20,11 +20,15 @@ class ReportController extends ChangeNotifier {
   /// Tracks report IDs this user has already confirmed. Persisted locally.
   final Set<String> _confirmedReportIds = {};
 
-  List<ReportModel> get reports => _reports;
+  List<ReportModel> get reports {
+    final sorted = List<ReportModel>.from(_reports);
+    sorted.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return sorted;
+  }
   List<AlertModel> get alerts => _alerts;
   bool get isLoading => _isLoading;
 
-  List<ReportModel> get activeReports => _reports.where((r) => !r.isResolved).toList();
+  List<ReportModel> get activeReports => reports.where((r) => !r.isResolved).toList();
 
   /// Returns true if the current user has already confirmed this report.
   bool hasConfirmed(String reportId) => _confirmedReportIds.contains(reportId);
@@ -75,8 +79,59 @@ class ReportController extends ChangeNotifier {
             tableName: 'reports',
             channelId: 'reports-sync',
             onEvent: (payload) {
-              AppLogger.info("Supabase Realtime Alert: reports updated. Syncing...");
-              loadReports();
+              final newRecord = payload.newRecord;
+              
+              if (payload.eventType == PostgresChangeEvent.insert && newRecord.isNotEmpty) {
+                final newUserId = newRecord['user_id']?.toString() ?? '';
+                final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+                
+                // Add to local list immediately
+                try {
+                  final newReport = ReportModel.fromJson(newRecord);
+                  if (!_reports.any((r) => r.id == newReport.id)) {
+                    _reports.insert(0, newReport);
+                    notifyListeners();
+                  }
+                } catch (e) {
+                  AppLogger.warn("Failed to parse realtime report insert: $e");
+                }
+                
+                if (newUserId != currentUserId) {
+                  final roadName = newRecord['road_name']?.toString() ?? 'a road';
+                  final hazard = newRecord['hazard_type']?.toString() ?? 'Hazard';
+                  NotificationService.instance.showWarningBanner(
+                    title: "🚨 New Report: $hazard",
+                    message: "A new hazard was just reported on $roadName. Pull to refresh for details.",
+                  );
+                }
+              } 
+              else if (payload.eventType == PostgresChangeEvent.update && newRecord.isNotEmpty) {
+                // Update local list for upvotes etc.
+                try {
+                  final updatedReport = ReportModel.fromJson(newRecord);
+                  final idx = _reports.indexWhere((r) => r.id == updatedReport.id);
+                  if (idx != -1) {
+                    // Update only fields that change, keep joined data if any
+                    final old = _reports[idx];
+                    _reports[idx] = old.copyWith(
+                      upvotes: updatedReport.upvotes,
+                      isResolved: updatedReport.isResolved,
+                      status: updatedReport.status,
+                      severity: updatedReport.severity,
+                    );
+                    notifyListeners();
+                  }
+                } catch (e) {
+                  AppLogger.warn("Failed to parse realtime report update: $e");
+                }
+              }
+              else if (payload.eventType == PostgresChangeEvent.delete) {
+                final deletedId = payload.oldRecord['id']?.toString();
+                if (deletedId != null) {
+                  _reports.removeWhere((r) => r.id == deletedId);
+                  notifyListeners();
+                }
+              }
             },
           );
         }
@@ -180,7 +235,7 @@ class ReportController extends ChangeNotifier {
       }
 
       // 2. Perform local update immediately
-      final finalReport = dbReport ?? newReport;
+      final finalReport = dbReport != null ? newReport.copyWith(id: dbReport.id) : newReport;
       _reports.insert(0, finalReport);
 
       // Award community contributor points

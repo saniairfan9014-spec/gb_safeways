@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/location_service.dart';
@@ -90,22 +91,29 @@ class EmergencyController extends ChangeNotifier {
   ];
 
   Future<void> makeCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
+    final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    final Uri launchUri = Uri.parse("tel:$cleanNumber");
     try {
       if (await canLaunchUrl(launchUri)) {
-        await launchUrl(launchUri);
-        AppLogger.success("Dialing: $phoneNumber");
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+        AppLogger.success("Dialing: $cleanNumber");
       } else {
         // Fallback for emulator / mock dials
         AppLogger.warn("Cannot launch dialer. Mocking dial on emulator...");
-        NotificationService.instance.showSuccessSnackbar("Mocking Call: Dialing $phoneNumber...");
+        NotificationService.instance.showSuccessSnackbar("Mocking Call: Dialing $cleanNumber...");
       }
     } catch (e) {
       AppLogger.error("Failed to launch dialer", e);
-      NotificationService.instance.showSuccessSnackbar("Mocking Call: Dialing $phoneNumber...");
+      NotificationService.instance.showSuccessSnackbar("Mocking Call: Dialing $cleanNumber...");
+    }
+  }
+
+  Future<bool> _hasInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -131,51 +139,93 @@ class EmergencyController extends ChangeNotifier {
     _sosTriggered = true;
     notifyListeners();
 
+    NotificationService.instance.showSuccessSnackbar("Processing SOS request...");
+
     // Fetch GPS coordinates to include in SOS message
     final location = await LocationService.instance.getCurrentLocation();
-    double lat = 35.9208; // default Gilgit
-    double lng = 74.3089;
+    double? lat;
+    double? lng;
     if (location != null) {
       lat = location.latitude;
       lng = location.longitude;
     }
 
-    final coordinates = "Lat: ${lat.toStringAsFixed(4)}, Lng: ${lng.toStringAsFixed(4)}";
+    final coordinates = lat != null && lng != null
+        ? "Lat: ${lat.toStringAsFixed(4)}, Lng: ${lng.toStringAsFixed(4)}"
+        : "Location unavailable";
 
-    // 1. Build SOS request
-    final newSosRequest = EmergencyRequestModel(
-      id: 'sos-${DateTime.now().millisecondsSinceEpoch}',
-      userId: user?.id ?? 'mock-uuid-1234',
-      userName: user?.fullName ?? 'Karakoram Traveler',
-      phoneNumber: user?.phoneNumber ?? '+92 355 4567890',
-      latitude: lat,
-      longitude: lng,
-      type: type,
-      message: message,
-      isActive: true,
-      createdAt: DateTime.now(),
-    );
+    final hasInternet = await _hasInternetConnection();
 
-    // 2. Trigger on Supabase if active
-    if (SupabaseService.instance.isInitialized) {
+    if (hasInternet && SupabaseService.instance.isInitialized) {
+      // ONLINE FLOW
+      final newSosRequest = EmergencyRequestModel(
+        id: 'sos-${DateTime.now().millisecondsSinceEpoch}',
+        userId: user?.id ?? 'mock-uuid-1234',
+        userName: user?.fullName ?? 'Karakoram Traveler',
+        phoneNumber: user?.phoneNumber ?? '+92 355 4567890',
+        latitude: lat ?? 35.9208,
+        longitude: lng ?? 74.3089,
+        type: type,
+        message: message,
+        isActive: true,
+        createdAt: DateTime.now(),
+      );
+
       try {
         AppLogger.info("Broadcasting emergency SOS beacon to Supabase...");
         _activeSos = await SupabaseService.instance.triggerSos(newSosRequest);
         AppLogger.success("Supabase SOS Broadcast Active: ${_activeSos?.id}");
+        
+        NotificationService.instance.showSuccessSnackbar("SOS sent online successfully");
+        NotificationService.instance.showWarningBanner(
+          title: "🚨 SOS ACTIVATED!",
+          message: "Your location ($coordinates) and profile details have been broadcasted to GBDMA and active Rescue teams.",
+        );
+        _startLocationSync(user);
       } catch (e) {
-        AppLogger.error("Failed to broadcast SOS to Supabase. Operating in mock offline backup.", e);
-        _activeSos = newSosRequest;
+        AppLogger.error("Online SOS failed, switching to offline fallback", e);
+        await _executeOfflineSos(user, coordinates, lat, lng);
       }
     } else {
-      _activeSos = newSosRequest;
+      // OFFLINE FLOW
+      await _executeOfflineSos(user, coordinates, lat, lng);
+    }
+  }
+
+  Future<void> _executeOfflineSos(UserModel? user, String coordinates, double? lat, double? lng) async {
+    AppLogger.warn("Executing Offline SOS Fallback...");
+    
+    final name = user?.fullName ?? 'Karakoram Traveler';
+    final phone = user?.phoneNumber ?? '';
+    final mapLink = lat != null && lng != null ? "https://maps.google.com/?q=$lat,$lng" : "";
+    
+    final smsBody = Uri.encodeComponent(
+      "Emergency SOS - No internet available\n"
+      "Name: $name\n"
+      "Phone: $phone\n"
+      "Location: $coordinates\n"
+      "$mapLink"
+    );
+
+    final String emergencyNumber = "1122";
+
+    // Launch SMS
+    final Uri smsUri = Uri.parse("sms:$emergencyNumber?body=$smsBody");
+    try {
+      if (await canLaunchUrl(smsUri)) {
+        await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      AppLogger.error("Failed to launch SMS", e);
     }
 
-    // 3. Start live location syncing timer
-    _startLocationSync(user);
+    // Launch Call after a brief delay
+    await Future.delayed(const Duration(seconds: 2));
+    await makeCall(emergencyNumber);
 
     NotificationService.instance.showWarningBanner(
-      title: "🚨 SOS ACTIVATED!",
-      message: "Your location ($coordinates) and profile details have been broadcasted to GBDMA and active Rescue teams.",
+      title: "🚨 OFFLINE SOS ACTIVATED!",
+      message: "Offline SOS activated (Call + SMS sent with location: $coordinates)",
     );
   }
 
