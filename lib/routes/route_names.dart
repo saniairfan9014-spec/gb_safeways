@@ -13,6 +13,7 @@ class RouteNames {
   static const String sosDetails = '/sos-details';
   static const String sosHistory = '/sos-history';
   static const String sosAdmin = '/sos-admin';
+  static const String adminDashboard = '/admin-dashboard';
   static const String settings = '/settings';
   static const String emergencyContacts = '/emergency-contacts';
   static const String helpSupport = '/help-support';

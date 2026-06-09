@@ -10,6 +10,7 @@ import '../features/emergency/view/emergency_screen.dart';
 import '../features/emergency/view/emergency_details_screen.dart';
 import '../features/emergency/view/sos_history_screen.dart';
 import '../features/emergency/view/admin_sos_dashboard.dart';
+import '../admin/screens/dashboard_screen.dart';
 import '../features/settings/view/settings_screen.dart';
 import '../features/settings/view/emergency_contacts_screen.dart';
 import '../features/settings/view/help_support_screen.dart';
@@ -58,6 +59,9 @@ class AppRoutes {
 
       case RouteNames.sosAdmin:
         return MaterialPageRoute(builder: (_) => const AdminSosDashboard());
+
+      case RouteNames.adminDashboard:
+        return MaterialPageRoute(builder: (_) => const DashboardScreen());
 
       case RouteNames.settings:
         return MaterialPageRoute(builder: (_) => const SettingsScreen());

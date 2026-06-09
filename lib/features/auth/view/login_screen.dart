@@ -5,6 +5,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../auth/controller/auth_controller.dart';
 import '../../../routes/route_names.dart';
+import '../../../admin/services/role_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,14 +37,35 @@ class _LoginScreenState extends State<LoginScreen> {
       password: _passwordController.text.trim(),
     );
 
-    if (!mounted) return;
-
     if (success) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        RouteNames.home,
-            (route) => false,
-      );
+      String role = 'user';
+      final userId = auth.currentUser?.id;
+
+      if (userId != null) {
+        // Fetch role cleanly using RoleService
+        role = await RoleService.getRole(userId);
+        
+        // If RoleService returns 'user' but our local auth controller detected 'admin' (offline mock mode)
+        if (role == 'user' && auth.currentUser?.role == 'admin') {
+          role = 'admin';
+        }
+      }
+
+      if (role == 'admin') {
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RouteNames.adminDashboard,
+          (route) => false,
+        );
+      } else {
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RouteNames.home,
+          (route) => false,
+        );
+      }
     }
   }
 

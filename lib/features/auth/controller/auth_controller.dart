@@ -35,6 +35,7 @@ class AuthController extends ChangeNotifier {
         final name = prefs.getString('user_name') ?? 'Karakoram Adventurer';
         final phone = prefs.getString('user_phone') ?? '+92 355 4567890';
         final contributions = prefs.getInt('user_contributions') ?? 3;
+        final role = prefs.getString('user_role') ?? 'user';
         final badge = _calculateBadge(contributions);
 
         _currentUser = UserModel(
@@ -45,6 +46,7 @@ class AuthController extends ChangeNotifier {
           phoneNumber: phone,
           contributionsCount: contributions,
           badge: badge,
+          role: role,
           createdAt: DateTime.now().subtract(const Duration(days: 15)),
         );
         AppLogger.success("Session loaded: ${_currentUser!.fullName}");
@@ -86,6 +88,7 @@ class AuthController extends ChangeNotifier {
           
           final name = email.split('@')[0].toUpperCase();
           const phone = '+92 355 4567890';
+          final role = email == 'admin@safeway.com' ? 'admin' : 'user';
           userProfile = UserModel(
             id: 'mock-uuid-1234',
             email: email,
@@ -94,6 +97,7 @@ class AuthController extends ChangeNotifier {
             phoneNumber: phone,
             contributionsCount: 4,
             badge: _calculateBadge(4),
+            role: role,
             createdAt: DateTime.now().subtract(const Duration(days: 30)),
           );
         } else {
@@ -109,6 +113,7 @@ class AuthController extends ChangeNotifier {
       await prefs.setString('user_email', _currentUser!.email);
       await prefs.setString('user_name', _currentUser!.fullName);
       await prefs.setString('user_phone', _currentUser!.phoneNumber);
+      await prefs.setString('user_role', _currentUser!.role);
       await prefs.setInt('user_contributions', _currentUser!.contributionsCount);
 
       NotificationService.instance.showSuccessSnackbar("Welcome, traveler ${_currentUser!.fullName}!");
@@ -171,6 +176,7 @@ class AuthController extends ChangeNotifier {
       await prefs.setString('user_email', _currentUser!.email);
       await prefs.setString('user_name', _currentUser!.fullName);
       await prefs.setString('user_phone', _currentUser!.phoneNumber);
+      await prefs.setString('user_role', _currentUser!.role);
       await prefs.setInt('user_contributions', _currentUser!.contributionsCount);
 
       NotificationService.instance.showSuccessSnackbar("Account created! Welcome to GB SafeRoute.");

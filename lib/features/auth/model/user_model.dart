@@ -6,6 +6,7 @@ class UserModel {
   final String phoneNumber;
   final int contributionsCount;
   final String badge;
+  final String role;
   final DateTime createdAt;
   UserModel copyWith({
     String? id,
@@ -15,6 +16,7 @@ class UserModel {
     String? phoneNumber,
     int? contributionsCount,
     String? badge,
+    String? role,
     DateTime? createdAt,
   }) {
     return UserModel(
@@ -25,6 +27,7 @@ class UserModel {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       contributionsCount: contributionsCount ?? this.contributionsCount,
       badge: badge ?? this.badge,
+      role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -38,6 +41,7 @@ class UserModel {
     required this.createdAt,
     this.contributionsCount = 0,
     this.badge = "Basecamp Guide",
+    this.role = "user",
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -47,6 +51,7 @@ class UserModel {
       fullName: json['name'] ?? '',
       avatarUrl: json['avatar'] ?? '',
       phoneNumber: json['phone'] ?? '',
+      role: json['role'] ?? 'user',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -60,7 +65,7 @@ class UserModel {
       'name': fullName,
       'phone': phoneNumber,
       'avatar': avatarUrl,
-      'role': 'user',
+      'role': role,
       'created_at': createdAt.toIso8601String(),
     };
   }
