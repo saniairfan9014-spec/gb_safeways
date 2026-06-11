@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../auth/controller/auth_controller.dart';
 import '../../../routes/route_names.dart';
@@ -18,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _obscurePassword = true;
 
   @override
@@ -30,42 +32,51 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
     final auth = context.read<AuthController>();
 
-    final success = await auth.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
+    try {
+      final success = await auth.login(
+        email: email,
+        password: password,
+      );
 
-    if (success) {
-      String role = 'user';
+      if (!mounted) return;
+
+      if (!success) {
+        debugPrint("❌ Login failed");
+        return;
+      }
+
       final userId = auth.currentUser?.id;
 
       if (userId != null) {
-        // Fetch role cleanly using RoleService
-        role = await RoleService.getRole(userId);
-        
-        // If RoleService returns 'user' but our local auth controller detected 'admin' (offline mock mode)
-        if (role == 'user' && auth.currentUser?.role == 'admin') {
-          role = 'admin';
-        }
-      }
+        final role = await RoleService.getRole(userId);
 
-      if (role == 'admin') {
-        if (!mounted) return;
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          RouteNames.adminDashboard,
-          (route) => false,
-        );
+        if (role == 'admin') {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            RouteNames.adminDashboard,
+                (route) => false,
+          );
+        } else {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            RouteNames.home,
+                (route) => false,
+          );
+        }
       } else {
-        if (!mounted) return;
         Navigator.pushNamedAndRemoveUntil(
           context,
           RouteNames.home,
-          (route) => false,
+              (route) => false,
         );
       }
+    } catch (e) {
+      debugPrint("💥 Login error: $e");
     }
   }
 
@@ -105,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Icon(Icons.email),
                     ),
                     validator: (v) =>
-                    v!.contains('@') ? null : "Enter valid email",
+                    (v != null && v.contains('@')) ? null : "Invalid email",
                   ),
 
                   const SizedBox(height: 15),
@@ -117,11 +128,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       labelText: "Password",
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility),
                         onPressed: () {
                           setState(() {
                             _obscurePassword = !_obscurePassword;
@@ -130,7 +139,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     validator: (v) =>
-                    v!.length < 6 ? "Min 6 characters" : null,
+                    (v != null && v.length >= 6)
+                        ? null
+                        : "Min 6 characters",
                   ),
 
                   const SizedBox(height: 25),
@@ -140,6 +151,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     isLoading: auth.isLoading,
                     onPressed: _login,
                   ),
+
+                  const SizedBox(height: 10),
 
                   TextButton(
                     onPressed: () {

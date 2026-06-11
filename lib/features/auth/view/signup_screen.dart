@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../auth/controller/auth_controller.dart';
 import '../../../routes/route_names.dart';
@@ -32,22 +33,33 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
     final auth = context.read<AuthController>();
 
-    final success = await auth.signUp(
-      fullName: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
+    try {
+      final success = await auth.signUp(
+        fullName: name,
+        email: email,
+        password: password,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (success) {
+      if (!success) {
+        debugPrint("❌ Signup failed");
+        return;
+      }
+
       Navigator.pushNamedAndRemoveUntil(
         context,
         RouteNames.home,
             (route) => false,
       );
+    } catch (e) {
+      debugPrint("💥 Signup error: $e");
     }
   }
 
@@ -87,7 +99,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       prefixIcon: Icon(Icons.person),
                     ),
                     validator: (v) =>
-                    v!.isEmpty ? "Enter name" : null,
+                    (v != null && v.isNotEmpty)
+                        ? null
+                        : "Enter name",
                   ),
 
                   const SizedBox(height: 15),
@@ -99,7 +113,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       prefixIcon: Icon(Icons.email),
                     ),
                     validator: (v) =>
-                    v!.contains('@') ? null : "Enter valid email",
+                    (v != null && v.contains('@'))
+                        ? null
+                        : "Invalid email",
                   ),
 
                   const SizedBox(height: 15),
@@ -111,11 +127,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       labelText: "Password",
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
+                        icon: Icon(_obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility),
                         onPressed: () {
                           setState(() {
                             _obscurePassword = !_obscurePassword;
@@ -124,7 +138,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     validator: (v) =>
-                    v!.length < 6 ? "Min 6 characters" : null,
+                    (v != null && v.length >= 6)
+                        ? null
+                        : "Min 6 characters",
                   ),
 
                   const SizedBox(height: 25),
@@ -135,12 +151,12 @@ class _SignupScreenState extends State<SignupScreen> {
                     onPressed: _signup,
                   ),
 
+                  const SizedBox(height: 10),
+
                   TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: () => Navigator.pop(context),
                     child: const Text(
-                      "Already have account? Login",
+                      "Already have an account? Login",
                       style: TextStyle(color: Colors.white),
                     ),
                   ),

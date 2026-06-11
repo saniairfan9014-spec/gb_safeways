@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/helpers.dart';
-import '../../../shared/widgets/empty_state.dart';
 import '../controller/road_controller.dart';
 import '../model/road_model.dart';
-import '../../home/widgets/road_card.dart';
 
 class RoadStatusScreen extends StatefulWidget {
   const RoadStatusScreen({super.key});
@@ -23,740 +19,170 @@ class _RoadStatusScreenState extends State<RoadStatusScreen> {
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // Detail bottom sheet
-  // ---------------------------------------------------------------------------
-  void _showRoadDetailsSheet(BuildContext context, dynamic road) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final statusColor = AppHelpers.getStatusColor(road.status);
-    final statusIcon = AppHelpers.getStatusIcon(road.status);
-
-    // Adaptive tokens
-    final sheetBg = isLight ? Colors.white : AppColors.surface;
-    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
-    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
-    final textMut = isLight ? const Color(0xFF94A3B8) : AppColors.textMuted;
-    final borderCol = isLight ? const Color(0xFFE2E8F0) : AppColors.border;
-    final boxBg = isLight ? const Color(0xFFF8FAFC) : AppColors.surfaceElevated;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: sheetBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Notch decoration
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: borderCol,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Name and Status
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        road.name,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: textPrim,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: statusColor.withOpacity(0.4)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(statusIcon, size: 14, color: statusColor),
-                          const SizedBox(width: 4),
-                          Text(
-                            (road.status.trim().isEmpty) ? 'NOT CONFIRMED' : road.status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: statusColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Origin & Destination
-                Text(
-                  "Route: ${road.origin} to ${road.destination}",
-                  style: TextStyle(color: textSec, fontSize: 14),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Distance: ${road.distanceKm} km  |  Last update: ${AppHelpers.formatDate(road.lastUpdated)}",
-                  style: TextStyle(color: textMut, fontSize: 12),
-                ),
-                Divider(color: borderCol, height: 32),
-
-                // Safety Indicators
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildMetricBox(
-                      icon: Icons.wb_cloudy_outlined,
-                      label: "WEATHER",
-                      value: road.weather,
-                      isLight: isLight,
-                    ),
-                    _buildMetricBox(
-                      icon: Icons.security_outlined,
-                      label: "SAFETY INDEX",
-                      value: "${road.safetyRating.toStringAsFixed(1)} / 5.0",
-                      isLight: isLight,
-                      valueColor: road.safetyRating >= 4.0
-                          ? AppColors.statusOpen
-                          : road.safetyRating >= 2.5
-                              ? AppColors.statusCaution
-                              : AppColors.statusDanger,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Description
-                Text(
-                  "Latest Travel Advisory",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: textPrim,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: boxBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderCol),
-                  ),
-                  child: Text(
-                    road.description,
-                    style: TextStyle(
-                      color: textSec,
-                      fontSize: 13,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Reusable widgets
-  // ---------------------------------------------------------------------------
-
-  Widget _buildMetricBox({
-    required IconData icon,
-    required String label,
-    required String value,
-    required bool isLight,
-    Color? valueColor,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, size: 24, color: const Color(0xFF0284C7)),
-        const SizedBox(height: 6),
-        Text(
-          label,
+  // ---------------- ROAD CARD ----------------
+  Widget _roadCard(RoadModel road, RoadController controller) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        title: Text(road.name),
+        subtitle: Text("${road.origin} → ${road.destination}"),
+        trailing: Text(
+          road.status.toUpperCase(),
           style: TextStyle(
-            fontSize: 10,
-            color: isLight ? const Color(0xFF94A3B8) : AppColors.textMuted,
+            color: road.status == "open"
+                ? Colors.green
+                : road.status == "closed"
+                ? Colors.red
+                : Colors.orange,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: valueColor ?? (isLight ? const Color(0xFF0F172A) : AppColors.textPrimary),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilterButton(String label, bool isSelected, VoidCallback onTap, bool isLight) {
-    Color activeBg;
-    Color inactiveBg;
-    Color activeFg = Colors.white;
-    Color inactiveFg;
-
-    if (label == "All") {
-      activeBg = const Color(0xFF0284C7);
-      inactiveBg = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
-      inactiveFg = isLight ? const Color(0xFF475569) : const Color(0xFF94A3B8);
-    } else if (label == "Open") {
-      activeBg = const Color(0xFF10B981);
-      inactiveBg = isLight ? const Color(0xFFE6F4EA) : const Color(0xFF064E3B).withOpacity(0.3);
-      inactiveFg = const Color(0xFF10B981);
-    } else if (label == "Blocked") {
-      activeBg = const Color(0xFF334155);
-      inactiveBg = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
-      inactiveFg = isLight ? const Color(0xFF475569) : const Color(0xFF94A3B8);
-    } else {
-      // Closed
-      activeBg = const Color(0xFFEF4444);
-      inactiveBg = isLight ? const Color(0xFFFCE8E6) : const Color(0xFF7F1D1D).withOpacity(0.3);
-      inactiveFg = const Color(0xFFEF4444);
-    }
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? activeBg : inactiveBg,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: isSelected
-                  ? activeBg
-                  : (isLight ? const Color(0xFFE2E8F0) : const Color(0xFF334155)),
-              width: 1,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? activeFg : inactiveFg,
-              ),
-            ),
-          ),
-        ),
+        onTap: () {},
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Skeleton shimmer loading placeholder
-  // ---------------------------------------------------------------------------
-  Widget _buildSkeletonCard(bool isLight) {
-    final shimmerBase = isLight ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B);
-    final shimmerHighlight = isLight ? const Color(0xFFF1F5F9) : const Color(0xFF334155);
+  // ---------------- ADD ROAD SHEET ----------------
+  void _addRoadSheet(BuildContext context) {
+    final name = TextEditingController();
+    final origin = TextEditingController();
+    final dest = TextEditingController();
+    final desc = TextEditingController();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isLight ? Colors.white : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isLight ? const Color(0xFFE2E8F0) : AppColors.border,
-          width: 1.2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _shimmerBlock(width: 180, height: 16, base: shimmerBase, highlight: shimmerHighlight),
-              _shimmerBlock(width: 64, height: 24, base: shimmerBase, highlight: shimmerHighlight, radius: 30),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _shimmerBlock(width: 240, height: 12, base: shimmerBase, highlight: shimmerHighlight),
-          const SizedBox(height: 16),
-          _shimmerBlock(width: double.infinity, height: 12, base: shimmerBase, highlight: shimmerHighlight),
-          const SizedBox(height: 6),
-          _shimmerBlock(width: 200, height: 12, base: shimmerBase, highlight: shimmerHighlight),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _shimmerBlock(width: 70, height: 12, base: shimmerBase, highlight: shimmerHighlight),
-              _shimmerBlock(width: 90, height: 12, base: shimmerBase, highlight: shimmerHighlight),
-              _shimmerBlock(width: 50, height: 12, base: shimmerBase, highlight: shimmerHighlight),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _shimmerBlock({
-    required double height,
-    required Color base,
-    required Color highlight,
-    double? width,
-    double radius = 8,
-  }) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.3, end: 1.0),
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeInOut,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Container(
-            width: width,
-            height: height,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
-              gradient: LinearGradient(
-                colors: [base, highlight, base],
-                stops: const [0.0, 0.5, 1.0],
-              ),
-            ),
-          ),
-        );
-      },
-      onEnd: () {
-        // Trigger rebuild to loop animation
-      },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Error state widget
-  // ---------------------------------------------------------------------------
-  Widget _buildErrorState(BuildContext context, RoadController controller, bool isLight) {
-    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
-    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
-    final borderCol = isLight ? const Color(0xFFE2E8F0) : AppColors.border;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.statusDanger.withOpacity(0.08),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.statusDanger.withOpacity(0.2), width: 1.5),
-              ),
-              child: Icon(
-                Icons.cloud_off_rounded,
-                size: 48,
-                color: AppColors.statusDanger.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Connection Lost",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: textPrim,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              controller.errorMessage ?? "Something went wrong.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: textSec, height: 1.5),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: () => controller.loadRoads(),
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text("Try Again"),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF0284C7),
-                side: BorderSide(color: borderCol),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
-  @override
-  Widget build(BuildContext context) {
-    final roadController = context.watch<RoadController>();
-    final isLight = Theme.of(context).brightness == Brightness.light;
-
-    // Adaptive tokens
-    final bgCol = isLight ? const Color(0xFFF8FAFC) : AppColors.background;
-    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
-    final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
-
-    return Scaffold(
-      backgroundColor: bgCol,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddRoadSheet(context),
-        backgroundColor: const Color(0xFF0284C7),
-        icon: const Icon(Icons.add_road_rounded, color: Colors.white),
-        label: const Text(
-          "Add Road",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header title
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Road Status",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: textPrim,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Live mountain highway logs and checkpoints",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: textSec,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Live indicator dot
-                  if (!roadController.isLoading && !roadController.hasError)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.statusOpen.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.statusOpen.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: AppColors.statusOpen,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            "LIVE",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.statusOpen,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Search Bar
-              TextField(
-                controller: _searchController,
-                onChanged: (val) => roadController.updateSearchQuery(val),
-                style: TextStyle(color: textPrim, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: "Search roads, passes, or checkpoints...",
-                  hintStyle: TextStyle(color: isLight ? const Color(0xFF94A3B8) : AppColors.textMuted),
-                  prefixIcon: Icon(Icons.search_rounded, color: isLight ? const Color(0xFF64748B) : AppColors.textSecondary),
-                  filled: true,
-                  fillColor: isLight ? Colors.white : AppColors.surfaceElevated,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: isLight ? const Color(0xFFE2E8F0) : AppColors.border, width: 1.2),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: isLight ? const Color(0xFFE2E8F0) : AppColors.border, width: 1.2),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
-                  ),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear_rounded, color: isLight ? const Color(0xFF64748B) : AppColors.textSecondary),
-                          onPressed: () {
-                            _searchController.clear();
-                            roadController.updateSearchQuery("");
-                          },
-                        )
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Filter Row
-              Row(
-                children: [
-                  _buildFilterButton("All", roadController.statusFilter == "All", () {
-                    roadController.setFilter("All");
-                  }, isLight),
-                  const SizedBox(width: 8),
-                  _buildFilterButton("Open", roadController.statusFilter == "Open", () {
-                    roadController.setFilter("Open");
-                  }, isLight),
-                  const SizedBox(width: 8),
-                  _buildFilterButton("Closed", roadController.statusFilter == "Closed", () {
-                    roadController.setFilter("Closed");
-                  }, isLight),
-                  const SizedBox(width: 8),
-                  _buildFilterButton("Blocked", roadController.statusFilter == "Blocked", () {
-                    roadController.setFilter("Blocked");
-                  }, isLight),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Roads List — Loading / Error / Empty / Data states
-              Expanded(
-                child: _buildBody(context, roadController, isLight),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Routes to the appropriate state widget.
-  Widget _buildBody(BuildContext context, RoadController controller, bool isLight) {
-    // ── Loading state ──
-    if (controller.isLoading) {
-      return ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 4,
-        itemBuilder: (_, __) => _buildSkeletonCard(isLight),
-      );
-    }
-
-    // ── Error state ──
-    if (controller.hasError) {
-      return _buildErrorState(context, controller, isLight);
-    }
-
-    // ── Data / Empty state ──
-    return RefreshIndicator(
-      onRefresh: () => controller.loadRoads(),
-      color: const Color(0xFF0284C7),
-      child: controller.filteredRoads.isEmpty
-          ? ListView(
-              children: [
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.5,
-                  child: EmptyState(
-                    title: "No Routes Found",
-                    description: "Try adjusting your search criteria or filters.",
-                    icon: Icons.directions_off_rounded,
-                    onAction: () {
-                      _searchController.clear();
-                      controller.updateSearchQuery("");
-                      controller.setFilter("All");
-                    },
-                    actionText: "Reset Filters",
-                  ),
-                ),
-              ],
-            )
-          : ListView.builder(
-              itemCount: controller.filteredRoads.length,
-              itemBuilder: (context, index) {
-                final road = controller.filteredRoads[index];
-                return RoadCard(
-                  road: road,
-                  onTap: () => _showRoadDetailsSheet(context, road),
-                );
-              },
-            ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Add Road bottom sheet
-  // ---------------------------------------------------------------------------
-  void _showAddRoadSheet(BuildContext context) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final sheetBg = isLight ? Colors.white : AppColors.surface;
-    final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
-    
-    final nameController = TextEditingController();
-    final originController = TextEditingController();
-    final destController = TextEditingController();
-    final descController = TextEditingController();
-    String selectedStatus = 'open';
+    String status = "open";
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: sheetBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: name, decoration: const InputDecoration(labelText: "Road Name")),
+              TextField(controller: origin, decoration: const InputDecoration(labelText: "Origin")),
+              TextField(controller: dest, decoration: const InputDecoration(labelText: "Destination")),
+              TextField(controller: desc, decoration: const InputDecoration(labelText: "Description")),
+
+              DropdownButton<String>(
+                value: status,
+                items: const [
+                  DropdownMenuItem(value: "open", child: Text("Open")),
+                  DropdownMenuItem(value: "closed", child: Text("Closed")),
+                  DropdownMenuItem(value: "blocked", child: Text("Blocked")),
+                ],
+                onChanged: (val) {
+                  if (val != null) status = val;
+                },
               ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Add New Road",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: textPrim,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: "Road Name (e.g. KKH, N-15)"),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: originController,
-                            decoration: const InputDecoration(labelText: "From (Origin)"),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: destController,
-                            decoration: const InputDecoration(labelText: "To (Destination)"),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedStatus,
-                      decoration: const InputDecoration(labelText: "Current Status"),
-                      items: const [
-                        DropdownMenuItem(value: 'open', child: Text("Open")),
-                        DropdownMenuItem(value: 'closed', child: Text("Closed")),
-                        DropdownMenuItem(value: 'blocked', child: Text("Blocked")),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedStatus = val);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: descController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(labelText: "Latest Advisory / Description"),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0284C7),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () {
-                          if (nameController.text.trim().isEmpty) return;
-                          
-                          final newRoad = RoadModel(
-                            id: 'road-${DateTime.now().millisecondsSinceEpoch}',
-                            name: nameController.text.trim(),
-                            status: selectedStatus,
-                            description: descController.text.trim().isNotEmpty ? descController.text.trim() : "No advisory available.",
-                            weather: "Clear",
-                            safetyRating: 4.5,
-                            origin: originController.text.trim().isNotEmpty ? originController.text.trim() : "Unknown",
-                            destination: destController.text.trim().isNotEmpty ? destController.text.trim() : "Unknown",
-                            distanceKm: 0,
-                            isVerified: false,
-                            createdBy: '',
-                            lastUpdated: DateTime.now(),
-                          );
-                          
-                          context.read<RoadController>().submitRoad(newRoad);
-                          Navigator.pop(ctx);
-                        },
-                        child: const Text("Submit Road", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+
+              ElevatedButton(
+                onPressed: () {
+                  final road = RoadModel(
+                    id: '',
+                    name: name.text,
+                    status: status,
+                    description: desc.text,
+                    origin: origin.text,
+                    destination: dest.text,
+                    distanceKm: 0.0,
+                    weather: 'Clear',
+                    safetyRating: 5.0,
+                    lastUpdated: DateTime.now(),
+                  );
+
+                  context.read<RoadController>().submitRoad(road);
+                  Navigator.pop(ctx);
+                },
+                child: const Text("Submit"),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
+    );
+  }
+
+  // ---------------- UI ----------------
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<RoadController>();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Road Status"),
+      ),
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addRoadSheet(context),
+        child: const Icon(Icons.add),
+      ),
+
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: _searchController,
+              onChanged: controller.updateSearchQuery,
+              decoration: const InputDecoration(
+                hintText: "Search roads...",
+                prefixIcon: Icon(Icons.search),
+              ),
+            ),
+          ),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              FilterChip(
+                label: const Text("All"),
+                selected: controller.statusFilter == "All",
+                onSelected: (_) => controller.setFilter("All"),
+              ),
+              FilterChip(
+                label: const Text("Open"),
+                selected: controller.statusFilter == "open",
+                onSelected: (_) => controller.setFilter("open"),
+              ),
+              FilterChip(
+                label: const Text("Closed"),
+                selected: controller.statusFilter == "closed",
+                onSelected: (_) => controller.setFilter("closed"),
+              ),
+              FilterChip(
+                label: const Text("Blocked"),
+                selected: controller.statusFilter == "blocked",
+                onSelected: (_) => controller.setFilter("blocked"),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Expanded(
+            child: controller.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : controller.hasError
+                ? Center(child: Text(controller.errorMessage!))
+                : controller.filteredRoads.isEmpty
+                ? const Center(child: Text("No Roads Found"))
+                : ListView.builder(
+              itemCount: controller.filteredRoads.length,
+              itemBuilder: (context, index) {
+                final road = controller.filteredRoads[index];
+                return _roadCard(road, controller);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

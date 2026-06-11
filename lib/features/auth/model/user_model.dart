@@ -48,9 +48,9 @@ class UserModel {
     return UserModel(
       id: json['id'].toString(),
       email: json['email'] ?? '',
-      fullName: json['name'] ?? '',
-      avatarUrl: json['avatar'] ?? '',
-      phoneNumber: json['phone'] ?? '',
+      fullName: json['full_name'] ?? json['name'] ?? '',
+      avatarUrl: json['avatar_url'] ?? json['avatar'] ?? '',
+      phoneNumber: json['phone_number'] ?? json['phone'] ?? '',
       role: json['role'] ?? 'user',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -62,9 +62,9 @@ class UserModel {
     return {
       'id': id,
       'email': email,
-      'name': fullName,
-      'phone': phoneNumber,
-      'avatar': avatarUrl,
+      'full_name': fullName,
+      'phone_number': phoneNumber,
+      'avatar_url': avatarUrl,
       'role': role,
       'created_at': createdAt.toIso8601String(),
     };

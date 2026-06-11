@@ -80,6 +80,23 @@ class SupabaseService {
         final user = res.user;
         if (user == null) return null;
 
+        // Manually insert into public.users to ensure the profile exists
+        // (This acts as a fallback or replacement if the SQL trigger fails/is missing)
+        try {
+          final existingUser = await client!.from('users').select('id').eq('id', user.id).maybeSingle();
+          if (existingUser == null) {
+            await client!.from('users').insert({
+              'id': user.id,
+              'email': email,
+              'full_name': fullName,
+              'avatar_url': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(fullName)}',
+              'phone_number': '+92 355 4567890',
+            });
+          }
+        } catch (e) {
+          AppLogger.warn("Manual user insert failed: $e");
+        }
+
         return await fetchUserProfile(user.id);
       },
       operationName: "signUp",
@@ -102,7 +119,28 @@ class SupabaseService {
         final user = res.user;
         if (user == null) return null;
 
-        return await fetchUserProfile(user.id);
+        UserModel? profile = await fetchUserProfile(user.id);
+        
+        // If profile is missing (e.g., trigger failed or old user), auto-create it now!
+        if (profile == null) {
+          AppLogger.warn("Profile missing in public.users for ${user.email}. Creating now...");
+          try {
+            final email = user.email ?? 'unknown@email.com';
+            final name = user.userMetadata?['full_name'] ?? email.split('@')[0];
+            await client!.from('users').insert({
+              'id': user.id,
+              'email': email,
+              'full_name': name,
+              'avatar_url': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}',
+              'phone_number': user.phone ?? '+92 355 4567890',
+            });
+            profile = await fetchUserProfile(user.id);
+          } catch (e) {
+            AppLogger.error("Failed to auto-create missing profile during login", e);
+          }
+        }
+
+        return profile;
       },
       operationName: "login",
       fallbackValue: null,

@@ -1,43 +1,71 @@
 class RoadModel {
   final String id;
   final String name;
-  final String status; // 'Open', 'Caution', 'Blocked'
+  final String status;
   final String description;
-  final String weather; // e.g., 'Clear', 'Heavy Rain', 'Heavy Snow', 'Foggy'
-  final double safetyRating; // 1.0 (very dangerous) to 5.0 (perfectly safe)
   final String origin;
   final String destination;
-  final int distanceKm;
+  final double distanceKm;
+  final String weather;
+  final double safetyRating;
+  final String? createdBy;
   final DateTime lastUpdated;
-  final bool isVerified;
-  final String createdBy;
 
   RoadModel({
     required this.id,
     required this.name,
     required this.status,
     required this.description,
-    required this.weather,
-    required this.safetyRating,
     required this.origin,
     required this.destination,
     required this.distanceKm,
-    required this.isVerified,
-    required this.createdBy,
+    required this.weather,
+    required this.safetyRating,
+    this.createdBy,
     required this.lastUpdated,
   });
+
+  factory RoadModel.fromJson(Map<String, dynamic> json) {
+    return RoadModel(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      status: (json['status'] ?? 'open').toString(),
+      description: json['description'] ?? '',
+      origin: json['from_location'] ?? '',
+      destination: json['to_location'] ?? '',
+      distanceKm: (json['distance_km'] ?? 0.0).toDouble(),
+      weather: json['weather'] ?? 'Clear',
+      safetyRating: (json['safety_rating'] ?? 5.0).toDouble(),
+      createdBy: json['created_by'],
+      lastUpdated: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'status': status,
+      'description': description,
+      'from_location': origin,
+      'to_location': destination,
+      'distance_km': distanceKm,
+      'weather': weather,
+      'safety_rating': safetyRating,
+      if (createdBy != null) 'created_by': createdBy,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+  }
 
   RoadModel copyWith({
     String? id,
     String? name,
     String? status,
     String? description,
-    String? weather,
-    double? safetyRating,
     String? origin,
     String? destination,
-    int? distanceKm,
-    bool? isVerified,
+    double? distanceKm,
+    String? weather,
+    double? safetyRating,
     String? createdBy,
     DateTime? lastUpdated,
   }) {
@@ -46,51 +74,13 @@ class RoadModel {
       name: name ?? this.name,
       status: status ?? this.status,
       description: description ?? this.description,
-      weather: weather ?? this.weather,
-      safetyRating: safetyRating ?? this.safetyRating,
       origin: origin ?? this.origin,
       destination: destination ?? this.destination,
       distanceKm: distanceKm ?? this.distanceKm,
-      isVerified: isVerified ?? this.isVerified,
+      weather: weather ?? this.weather,
+      safetyRating: safetyRating ?? this.safetyRating,
       createdBy: createdBy ?? this.createdBy,
       lastUpdated: lastUpdated ?? this.lastUpdated,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'status': status,
-      'description': description,
-      'origin': origin,
-      'destination': destination,
-      'from_location': origin,
-      'to_location': destination,
-      'weather': weather,
-      'safety_rating': safetyRating,
-      'distance_km': distanceKm,
-      'is_verified': isVerified,
-      'created_by': createdBy,
-      'last_updated': lastUpdated.toIso8601String(),
-      'updated_at': lastUpdated.toIso8601String(),
-    };
-  }
-
-  factory RoadModel.fromJson(Map<String, dynamic> json) {
-    return RoadModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      status: json['status'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      weather: json['weather'] as String? ?? 'Clear',
-      safetyRating: json['safety_rating'] != null ? (json['safety_rating'] as num).toDouble() : 4.5,
-      origin: json['from_location'] as String? ?? json['origin'] as String? ?? 'Origin',
-      destination: json['to_location'] as String? ?? json['destination'] as String? ?? 'Destination',
-      distanceKm: json['distance_km'] as int? ?? 100,
-      isVerified: json['is_verified'] as bool? ?? false,
-      createdBy: json['created_by'] as String? ?? '',
-      lastUpdated: DateTime.parse(json['updated_at'] as String? ?? json['last_updated'] as String? ?? DateTime.now().toIso8601String()),
     );
   }
 }
