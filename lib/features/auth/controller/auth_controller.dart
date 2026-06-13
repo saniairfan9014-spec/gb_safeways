@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/supabase_client.dart';
 import '../../../core/utils/helpers.dart';
@@ -34,6 +37,7 @@ class AuthController extends ChangeNotifier {
         final email = prefs.getString('user_email') ?? 'traveler@karakoram.com';
         final name = prefs.getString('user_name') ?? 'Karakoram Adventurer';
         final phone = prefs.getString('user_phone') ?? '+92 355 4567890';
+        final bio = prefs.getString('user_bio');
         final contributions = prefs.getInt('user_contributions') ?? 3;
         final role = prefs.getString('user_role') ?? 'user';
         final badge = _calculateBadge(contributions);
@@ -44,6 +48,7 @@ class AuthController extends ChangeNotifier {
           fullName: name,
           avatarUrl: AppHelpers.getRandomAvatarUrl(name),
           phoneNumber: phone,
+          bio: bio,
           contributionsCount: contributions,
           badge: badge,
           role: role,
@@ -237,6 +242,69 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<bool> editProfile({
+    required String fullName,
+    required String phoneNumber,
+    String? bio,
+    File? newAvatarFile,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      if (fullName.trim().isEmpty) {
+        throw Exception("Name cannot be empty.");
+      }
+
+      String? newAvatarUrl;
+
+      // 1. Upload new avatar if provided
+      if (newAvatarFile != null && _currentUser != null) {
+        newAvatarUrl = await uploadAvatar(newAvatarFile, _currentUser!.id);
+      }
+
+      // 2. Update profile in Supabase
+      if (SupabaseService.instance.isInitialized && _currentUser != null) {
+        AppLogger.info("Editing profile on Supabase...");
+        await SupabaseService.instance.updateUserProfile(
+          userId: _currentUser!.id,
+          fullName: fullName,
+          phoneNumber: phoneNumber,
+          bio: bio,
+          avatarUrl: newAvatarUrl,
+        );
+      } else {
+        // Fallback for offline/simulation mode
+        await Future.delayed(const Duration(milliseconds: 800));
+      }
+
+      // 3. Update local state
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(
+          fullName: fullName,
+          phoneNumber: phoneNumber,
+          bio: bio,
+          avatarUrl: newAvatarUrl ?? _currentUser!.avatarUrl,
+        );
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', fullName);
+      await prefs.setString('user_phone', phoneNumber);
+      if (bio != null) await prefs.setString('user_bio', bio);
+
+      NotificationService.instance.showSuccessSnackbar("Profile updated successfully!");
+      return true;
+    } catch (e) {
+      AppLogger.error("Failed to edit profile", e);
+      NotificationService.instance.showErrorSnackbar(e.toString().replaceAll("Exception: ", ""));
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     if (SupabaseService.instance.isInitialized) {
       await SupabaseService.instance.logout();
@@ -302,6 +370,67 @@ class AuthController extends ChangeNotifier {
       return "Karakoram Sentinel";
     } else {
       return "Basecamp Guide";
+    }
+  }
+
+  // STEP 4: Image pick function
+  final ImagePicker picker = ImagePicker();
+
+  Future<File?> pickImage() async {
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image == null) return null;
+
+    return File(image.path);
+  }
+
+  // STEP 5: Upload to Supabase Storage
+  Future<String?> uploadAvatar(File file, String userId) async {
+    final fileName = 'avatar_$userId.png';
+
+    await Supabase.instance.client.storage
+        .from('avatars')
+        .upload(fileName, file, fileOptions: const FileOptions(upsert: true));
+
+    final publicUrl = Supabase.instance.client.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+    return publicUrl;
+  }
+
+  // STEP 6: Save URL in users table
+  Future<void> updateUserAvatar(String url, String userId) async {
+    await Supabase.instance.client
+        .from('users')
+        .update({'avatar': url})
+        .eq('id', userId);
+  }
+
+  // STEP 7: Combine (Full flow)
+  Future<void> changeAvatar(String userId) async {
+    final file = await pickImage();
+    if (file == null) return;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final url = await uploadAvatar(file, userId);
+      if (url == null) return;
+
+      await updateUserAvatar(url, userId);
+      
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(avatarUrl: url);
+      }
+      NotificationService.instance.showSuccessSnackbar("Avatar updated!");
+    } catch (e) {
+      AppLogger.error("Avatar update failed", e);
+      NotificationService.instance.showErrorSnackbar("Failed to update avatar");
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

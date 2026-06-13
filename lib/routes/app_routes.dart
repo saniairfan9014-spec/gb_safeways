@@ -3,6 +3,7 @@ import '../features/auth/view/login_screen.dart';
 import '../features/auth/view/signup_screen.dart';
 import '../features/home/view/home_screen.dart';
 import '../features/auth/view/profile_screen.dart';
+import '../features/auth/view/edit_profile_screen.dart';
 import '../features/roads/view/road_status_screen.dart';
 import '../features/reports/view/report_screen.dart';
 import '../features/reports/view/alerts_screen.dart';
@@ -50,6 +51,11 @@ class AppRoutes {
 
       case RouteNames.profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+
+      case RouteNames.editProfile:
+        return MaterialPageRoute(
+          builder: (_) => const EditProfileScreen(),
+        );
 
       case RouteNames.sosDetails:
         return MaterialPageRoute(builder: (_) => const EmergencyDetailsScreen());

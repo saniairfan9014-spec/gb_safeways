@@ -89,7 +89,7 @@ class SupabaseService {
               'id': user.id,
               'email': email,
               'full_name': fullName,
-              'avatar_url': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(fullName)}',
+              'avatar': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(fullName)}',
               'phone_number': '+92 355 4567890',
             });
           }
@@ -131,7 +131,7 @@ class SupabaseService {
               'id': user.id,
               'email': email,
               'full_name': name,
-              'avatar_url': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}',
+              'avatar': 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}',
               'phone_number': user.phone ?? '+92 355 4567890',
             });
             profile = await fetchUserProfile(user.id);
@@ -171,6 +171,44 @@ class SupabaseService {
         );
       },
       operationName: "fetchUserProfile",
+      fallbackValue: null,
+    );
+  }
+
+  Future<void> updateUserProfile({
+    required String userId,
+    required String fullName,
+    required String phoneNumber,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    if (!_isValidUuid(userId)) {
+      throw Exception('Invalid user session. Cannot update profile.');
+    }
+
+    await _executeWithRetry<void>(
+      () async {
+        try {
+          final Map<String, dynamic> updates = {
+            'full_name': fullName,
+            'phone_number': phoneNumber,
+            'bio': bio,
+          };
+          if (avatarUrl != null) {
+            updates['avatar'] = avatarUrl;
+          }
+          
+          await client!.from('users').update(updates).eq('id', userId);
+        } on PostgrestException catch (e) {
+          if (e.code == '23505' && e.message.toLowerCase().contains('phone')) {
+            throw Exception('This phone number is already registered to another account.');
+          }
+          throw Exception(e.message);
+        } catch (e) {
+          throw Exception('An unexpected error occurred while updating profile.');
+        }
+      },
+      operationName: "updateUserProfile",
       fallbackValue: null,
     );
   }

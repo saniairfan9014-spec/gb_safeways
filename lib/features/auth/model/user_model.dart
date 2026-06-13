@@ -4,6 +4,7 @@ class UserModel {
   final String fullName;
   final String avatarUrl;
   final String phoneNumber;
+  final String? bio;
   final int contributionsCount;
   final String badge;
   final String role;
@@ -14,6 +15,7 @@ class UserModel {
     String? fullName,
     String? avatarUrl,
     String? phoneNumber,
+    String? bio,
     int? contributionsCount,
     String? badge,
     String? role,
@@ -25,6 +27,7 @@ class UserModel {
       fullName: fullName ?? this.fullName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      bio: bio ?? this.bio,
       contributionsCount: contributionsCount ?? this.contributionsCount,
       badge: badge ?? this.badge,
       role: role ?? this.role,
@@ -38,6 +41,7 @@ class UserModel {
     required this.fullName,
     required this.avatarUrl,
     required this.phoneNumber,
+    this.bio,
     required this.createdAt,
     this.contributionsCount = 0,
     this.badge = "Basecamp Guide",
@@ -51,6 +55,7 @@ class UserModel {
       fullName: json['full_name'] ?? json['name'] ?? '',
       avatarUrl: json['avatar_url'] ?? json['avatar'] ?? '',
       phoneNumber: json['phone_number'] ?? json['phone'] ?? '',
+      bio: json['bio'],
       role: json['role'] ?? 'user',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -64,7 +69,8 @@ class UserModel {
       'email': email,
       'full_name': fullName,
       'phone_number': phoneNumber,
-      'avatar_url': avatarUrl,
+      'avatar': avatarUrl,
+      'bio': bio,
       'role': role,
       'created_at': createdAt.toIso8601String(),
     };

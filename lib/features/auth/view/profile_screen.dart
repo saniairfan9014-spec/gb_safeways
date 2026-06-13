@@ -24,16 +24,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  // Local state for toggles and settings
   bool _pushNotifications = true;
   String _selectedLanguage = "English";
 
-  // Privacy preferences states
   bool _shareLocation = true;
   bool _anonymousReports = false;
   bool _publicVisibility = true;
 
-  // Language Dialog
   void _showLanguageDialog(BuildContext context, bool isLight) {
     final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
     final cardBg = isLight ? Colors.white : AppColors.surface;
@@ -80,7 +77,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Emergency Contacts Modal Bottom Sheet
   void _showEmergencyContactsSheet(BuildContext context, bool isLight) {
     final emergencyController = context.read<EmergencyController>();
     final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
@@ -158,7 +154,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(fontSize: 12, color: textSec),
                         ),
                         trailing: IconButton(
-                          icon: const Icon(Icons.phone_forwarded_rounded, color: Color(0xFF0284C7), size: 18),
+                          icon: const Icon(Icons.phone_forwarded_rounded,
+                              color: Color(0xFF0284C7), size: 18),
                           onPressed: () {
                             Navigator.pop(ctx);
                             emergencyController.makeCall(contact.phone);
@@ -176,7 +173,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Privacy Settings Modal Bottom Sheet
   void _showPrivacySettingsSheet(BuildContext context, bool isLight) {
     final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
     final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
@@ -224,13 +220,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: TextStyle(fontSize: 13, color: textSec),
                     ),
                     const SizedBox(height: 16),
-                    
-                    // Share Location Toggle
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         "Live Dispatch Tracking",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
                       ),
                       subtitle: Text(
                         "Share live GPS location with rescuers during active SOS triggers.",
@@ -242,18 +237,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         setModalState(() => _shareLocation = val);
                         setState(() => _shareLocation = val);
                         NotificationService.instance.showSuccessSnackbar(
-                          val ? "Emergency tracking enabled." : "Emergency tracking disabled.",
+                          val
+                              ? "Emergency tracking enabled."
+                              : "Emergency tracking disabled.",
                         );
                       },
                     ),
                     const Divider(height: 16),
-
-                    // Anonymous Toggle
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         "Anonymous Reporting",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
                       ),
                       subtitle: Text(
                         "Hide your name on community landslide or road blockage alerts.",
@@ -270,13 +266,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
                     const Divider(height: 16),
-
-                    // Public Profile Visibility
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         "Guide Directory Visibility",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold, color: textPrim),
                       ),
                       subtitle: Text(
                         "Allow certified high-altitude guides to see your route history.",
@@ -288,7 +283,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         setModalState(() => _publicVisibility = val);
                         setState(() => _publicVisibility = val);
                         NotificationService.instance.showSuccessSnackbar(
-                          val ? "Profile visible to rescue guides." : "Profile set to private.",
+                          val
+                              ? "Profile visible to rescue guides."
+                              : "Profile set to private.",
                         );
                       },
                     ),
@@ -316,7 +313,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // Adaptive token styles (optimized for high readability and mountainous usage)
     final bgCol = isLight ? const Color(0xFFF8FAFC) : AppColors.background;
     final textPrim = isLight ? const Color(0xFF0F172A) : AppColors.textPrimary;
     final textSec = isLight ? const Color(0xFF475569) : AppColors.textSecondary;
@@ -324,9 +320,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final cardBg = isLight ? Colors.white : AppColors.surface;
     final borderCol = isLight ? const Color(0xFFF1F5F9) : AppColors.border;
 
-    // SOS Requests: Dynamic check if currently triggered, else standard mock
-    final sosCount = authController.emergenciesCount > 0 
-        ? authController.emergenciesCount 
+    final sosCount = authController.emergenciesCount > 0
+        ? authController.emergenciesCount
         : (emergencyController.sosTriggered ? 3 : 2);
 
     return Scaffold(
@@ -348,6 +343,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             letterSpacing: -0.5,
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pushNamed(context, RouteNames.editProfile),
+            child: const Text(
+              "Edit Profile",
+              style: TextStyle(
+                color: Color(0xFF0284C7),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -356,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Top Identity Section (User Avatar, Name, Email/Phone)
+              // 1. Identity Card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -373,39 +382,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Column(
                   children: [
-                    Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF0284C7), width: 3),
-                          ),
-                          child: CircleAvatar(
-                            radius: 46,
-                            backgroundColor: const Color(0xFF0284C7).withOpacity(0.1),
-                            backgroundImage: NetworkImage(user.avatarUrl),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0284C7),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: cardBg, width: 2),
-                          ),
-                          child: const Text(
-                            "ACTIVE",
-                            style: TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
+                    // ================= AVATAR FIX =================
+                    // Removed conflicting Material/InkWell
+                    // Single GestureDetector handles the whole avatar + badge area
+                    GestureDetector(
+                      onTap: authController.isLoading
+                          ? null
+                          : () => context.read<AuthController>().changeAvatar(user.id),
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: const Color(0xFF0284C7), width: 3),
+                            ),
+                            child: CircleAvatar(
+                              radius: 46,
+                              backgroundColor:
+                              const Color(0xFF0284C7).withOpacity(0.1),
+                              backgroundImage: user.avatarUrl.isNotEmpty
+                                  ? NetworkImage(user.avatarUrl) as ImageProvider
+                                  : null,
+                              child: authController.isLoading
+                                  ? const CircularProgressIndicator()
+                                  : (user.avatarUrl.isEmpty
+                                  ? const Icon(Icons.person,
+                                  size: 40, color: Color(0xFF0284C7))
+                                  : null),
                             ),
                           ),
-                        ),
-                      ],
+                          // IgnorePointer so badge does NOT block GestureDetector
+                          IgnorePointer(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0284C7),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: cardBg, width: 2),
+                              ),
+                              child: const Text(
+                                "ACTIVE",
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -429,12 +460,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     Divider(color: borderCol, height: 1),
                     const SizedBox(height: 12),
-                    
-                    // Email Info Row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.email_outlined, size: 16, color: Color(0xFF0284C7)),
+                        const Icon(Icons.email_outlined,
+                            size: 16, color: Color(0xFF0284C7)),
                         const SizedBox(width: 8),
                         Text(
                           user.email,
@@ -442,7 +472,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    // Phone Info Row — only show if user has a real phone number
                     if (user.phoneNumber.isNotEmpty &&
                         user.phoneNumber != '+92 355 4567890')
                       Padding(
@@ -450,11 +479,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.phone_iphone_rounded, size: 16, color: Color(0xFF0284C7)),
+                            const Icon(Icons.phone_iphone_rounded,
+                                size: 16, color: Color(0xFF0284C7)),
                             const SizedBox(width: 8),
                             Text(
                               user.phoneNumber,
-                              style: TextStyle(fontSize: 13, color: textSec, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: textSec,
+                                  fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
@@ -464,10 +497,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 2. Stats Section Cards
+              // 2. Stats Cards
               Row(
                 children: [
-                  // Total Reports Sent Card
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(16),
@@ -489,21 +521,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                "Total Reports",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: textSec,
-                                ),
-                              ),
+                              Text("Total Reports",
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: textSec)),
                               Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B).withOpacity(0.08),
+                                  color:
+                                  const Color(0xFFF59E0B).withOpacity(0.08),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.campaign_rounded, color: Color(0xFFF59E0B), size: 16),
+                                child: const Icon(Icons.campaign_rounded,
+                                    color: Color(0xFFF59E0B), size: 16),
                               ),
                             ],
                           ),
@@ -511,23 +542,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             "${user.contributionsCount}",
                             style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              color: textPrim,
-                            ),
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: textPrim),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            "Safety contributions",
-                            style: TextStyle(fontSize: 10, color: textMut),
-                          ),
+                          Text("Safety contributions",
+                              style: TextStyle(fontSize: 10, color: textMut)),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 16),
-
-                  // Emergency SOS Requests Card
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(16),
@@ -549,21 +575,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                "SOS Beacons",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: textSec,
-                                ),
-                              ),
+                              Text("SOS Beacons",
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: textSec)),
                               Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withOpacity(0.08),
+                                  color:
+                                  const Color(0xFFEF4444).withOpacity(0.08),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.sensors_rounded, color: Color(0xFFEF4444), size: 16),
+                                child: const Icon(Icons.sensors_rounded,
+                                    color: Color(0xFFEF4444), size: 16),
                               ),
                             ],
                           ),
@@ -571,16 +596,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             "$sosCount",
                             style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              color: textPrim,
-                            ),
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: textPrim),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            "Total requests made",
-                            style: TextStyle(fontSize: 10, color: textMut),
-                          ),
+                          Text("Total requests made",
+                              style: TextStyle(fontSize: 10, color: textMut)),
                         ],
                       ),
                     ),
@@ -615,206 +637,221 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Column(
                   children: [
-                    // Notifications Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.notifications_active_outlined, color: Color(0xFF0284C7), size: 18),
+                        child: const Icon(Icons.notifications_active_outlined,
+                            color: Color(0xFF0284C7), size: 18),
                       ),
-                      title: Text(
-                        "Safety Notifications",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
-                      ),
+                      title: Text("Safety Notifications",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: textPrim)),
                       trailing: Switch.adaptive(
                         value: _pushNotifications,
                         onChanged: (val) {
-                          setState(() {
-                            _pushNotifications = val;
-                          });
+                          setState(() => _pushNotifications = val);
                           NotificationService.instance.showSuccessSnackbar(
-                            val ? "Road hazard alerts activated." : "Alerts muted. Stay cautious!",
+                            val
+                                ? "Road hazard alerts activated."
+                                : "Alerts muted. Stay cautious!",
                           );
                         },
                         activeColor: const Color(0xFF0284C7),
                       ),
                     ),
                     Divider(color: borderCol, height: 1, thickness: 1),
-
-                    // Language Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.translate_rounded, color: Color(0xFF0284C7), size: 18),
+                        child: const Icon(Icons.translate_rounded,
+                            color: Color(0xFF0284C7), size: 18),
                       ),
-                      title: Text(
-                        "Language Selection",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
-                      ),
+                      title: Text("Language Selection",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: textPrim)),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            _selectedLanguage,
-                            style: TextStyle(color: textSec, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
+                          Text(_selectedLanguage,
+                              style: TextStyle(
+                                  color: textSec,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold)),
                           const SizedBox(width: 4),
-                          Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
+                          Icon(Icons.chevron_right_rounded,
+                              color: textMut, size: 18),
                         ],
                       ),
                       onTap: () => _showLanguageDialog(context, isLight),
                     ),
                     Divider(color: borderCol, height: 1, thickness: 1),
-
-                    // Emergency Contacts Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.emergency_outlined, color: Color(0xFF0284C7), size: 18),
+                        child: const Icon(Icons.emergency_outlined,
+                            color: Color(0xFF0284C7), size: 18),
                       ),
-                      title: Text(
-                        "Emergency Patrol Contacts",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
-                      ),
-                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
-                      onTap: () => _showEmergencyContactsSheet(context, isLight),
+                      title: Text("Emergency Patrol Contacts",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: textPrim)),
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: textMut, size: 18),
+                      onTap: () =>
+                          _showEmergencyContactsSheet(context, isLight),
                     ),
                     Divider(color: borderCol, height: 1, thickness: 1),
-
-                    // Privacy Settings Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.shield_outlined, color: Color(0xFF0284C7), size: 18),
+                        child: const Icon(Icons.shield_outlined,
+                            color: Color(0xFF0284C7), size: 18),
                       ),
-                      title: Text(
-                        "Privacy & Tracking Settings",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
-                      ),
-                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
+                      title: Text("Privacy & Tracking Settings",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: textPrim)),
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: textMut, size: 18),
                       onTap: () => _showPrivacySettingsSheet(context, isLight),
                     ),
                     Divider(color: borderCol, height: 1, thickness: 1),
-
-                    // My SOS History Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEF4444).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.history_toggle_off_rounded, color: Color(0xFFEF4444), size: 18),
+                        child: const Icon(Icons.history_toggle_off_rounded,
+                            color: Color(0xFFEF4444), size: 18),
                       ),
-                      title: Text(
-                        "My SOS History",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
-                      ),
+                      title: Text("My SOS History",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: textPrim)),
                       subtitle: const Text(
                         "View your historical satellite distress beacons",
-                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        style:
+                        TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       ),
-                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
-                      onTap: () {
-                        Navigator.pushNamed(context, RouteNames.sosHistory);
-                      },
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: textMut, size: 18),
+                      onTap: () =>
+                          Navigator.pushNamed(context, RouteNames.sosHistory),
                     ),
                     Divider(color: borderCol, height: 1, thickness: 1),
-
-                    // Admin Verification Portal Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF10B981).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.admin_panel_settings_outlined, color: Color(0xFF10B981), size: 18),
+                        child: const Icon(Icons.admin_panel_settings_outlined,
+                            color: Color(0xFF10B981), size: 18),
                       ),
-                      title: Text(
-                        "Admin Verification Portal",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
-                      ),
+                      title: Text("Admin Verification Portal",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: textPrim)),
                       subtitle: const Text(
                         "Review hazard alerts and change highway status",
-                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        style:
+                        TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       ),
-                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const AdminReportsScreen(),
-                          ),
-                        );
-                      },
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: textMut, size: 18),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const AdminReportsScreen()),
+                      ),
                     ),
                     Divider(color: borderCol, height: 1, thickness: 1),
-
-                    // Admin SOS Dashboard Row
                     ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEF4444).withOpacity(0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.admin_panel_settings_outlined, color: Color(0xFFEF4444), size: 18),
+                        child: const Icon(Icons.admin_panel_settings_outlined,
+                            color: Color(0xFFEF4444), size: 18),
                       ),
-                      title: Text(
-                        "Admin SOS Dashboard",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrim),
-                      ),
+                      title: Text("Admin SOS Dashboard",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: textPrim)),
                       subtitle: const Text(
                         "Monitor real-time active valley SOS alerts",
-                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        style:
+                        TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       ),
-                      trailing: Icon(Icons.chevron_right_rounded, color: textMut, size: 18),
-                      onTap: () {
-                        Navigator.pushNamed(context, RouteNames.sosAdmin);
-                      },
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: textMut, size: 18),
+                      onTap: () =>
+                          Navigator.pushNamed(context, RouteNames.sosAdmin),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 36),
 
-              // 4. Logout Button (highlighted but minimal)
+              // 4. Logout Button
               ElevatedButton(
                 onPressed: () {
-                  // Standard confirm logout dialog
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
                       backgroundColor: cardBg,
                       surfaceTintColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      title: Text(
-                        "Sign Out",
-                        style: TextStyle(fontWeight: FontWeight.bold, color: textPrim, fontSize: 18),
-                      ),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      title: Text("Sign Out",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: textPrim,
+                              fontSize: 18)),
                       content: Text(
                         "Are you sure you want to log out from GB SafeRoute? Direct disaster alerts will be inactive.",
                         style: TextStyle(color: textSec, fontSize: 14),
@@ -822,39 +859,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx),
-                          child: Text("Cancel", style: TextStyle(color: textSec, fontWeight: FontWeight.bold)),
+                          child: Text("Cancel",
+                              style: TextStyle(
+                                  color: textSec,
+                                  fontWeight: FontWeight.bold)),
                         ),
                         ElevatedButton(
                           onPressed: () {
-                            Navigator.pop(ctx); // Close dialog
-                            Navigator.pop(context); // Go back from profile
+                            Navigator.pop(ctx);
+                            Navigator.pop(context);
                             authController.logout();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFEF4444),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
                           ),
-                          child: const Text("Log Out", style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text("Log Out",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEF4444).withOpacity(0.06),
+                  backgroundColor:
+                  const Color(0xFFEF4444).withOpacity(0.06),
                   foregroundColor: const Color(0xFFEF4444),
                   elevation: 0,
                   shadowColor: Colors.transparent,
-                  side: BorderSide(color: const Color(0xFFEF4444).withOpacity(0.12), width: 1.0),
+                  side: BorderSide(
+                      color: const Color(0xFFEF4444).withOpacity(0.12),
+                      width: 1.0),
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
-                    Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
+                    Icon(Icons.logout_rounded,
+                        color: Color(0xFFEF4444), size: 18),
                     SizedBox(width: 8),
                     Text(
                       "Log Out Account",

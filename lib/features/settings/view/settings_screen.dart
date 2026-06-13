@@ -9,86 +9,7 @@ import '../../../routes/route_names.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  void _showEditProfileDialog(BuildContext context, AuthController authController, bool isDark) {
-    final user = authController.currentUser;
-    if (user == null) return;
 
-    final nameController = TextEditingController(text: user.fullName);
-    final emailController = TextEditingController(text: user.email);
-    final phoneController = TextEditingController(text: user.phoneNumber);
-
-    final textPrim = isDark ? AppColors.textPrimary : const Color(0xFF0F172A);
-    final cardBg = isDark ? AppColors.surfaceElevated : Colors.white;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cardBg,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
-          "Edit Profile Info",
-          style: TextStyle(fontWeight: FontWeight.bold, color: textPrim, fontSize: 18),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                style: TextStyle(color: textPrim),
-                decoration: const InputDecoration(
-                  labelText: "Full Name",
-                  prefixIcon: Icon(Icons.person_rounded),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: emailController,
-                style: TextStyle(color: textPrim),
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: "Email Address",
-                  prefixIcon: Icon(Icons.email_rounded),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneController,
-                style: TextStyle(color: textPrim),
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: "Phone Number",
-                  prefixIcon: Icon(Icons.phone_rounded),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("Cancel", style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final navigator = Navigator.of(ctx);
-              final success = await authController.updateProfile(
-                fullName: nameController.text.trim(),
-                email: emailController.text.trim(),
-                phoneNumber: phoneController.text.trim(),
-              );
-              if (success && ctx.mounted) {
-                navigator.pop();
-              }
-            },
-            child: const Text("Save Changes"),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showLanguageDialog(BuildContext context, SettingsController settingsController, bool isDark) {
     final textPrim = isDark ? AppColors.textPrimary : const Color(0xFF0F172A);
@@ -253,7 +174,9 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: () => _showEditProfileDialog(context, authController, isDark),
+                      onPressed: () {
+                        Navigator.pushNamed(context, RouteNames.editProfile);
+                      },
                       icon: const Icon(Icons.edit_rounded, size: 16),
                       label: const Text("Edit Profile Info", style: TextStyle(fontSize: 13)),
                       style: ElevatedButton.styleFrom(
